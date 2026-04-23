@@ -1,0 +1,24 @@
+artifact_path: "file:///C:/Users/igor_/OneDrive/Desktop/Tecnologia da Informa\xE7\xE3\
+  o - TI/datathon-grupo-XX/mlruns/1/models/m-8bdeffa9c7944f9494cd07ab2b5ca780/artifacts"
+flavors:
+  python_function:
+    config:
+      device: null
+    data: data
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.pytorch
+    pickle_module_name: mlflow.pytorch.pickle_module
+    python_version: 3.11.1
+  pytorch:
+    code: null
+    model_data: data
+    pytorch_version: 2.10.0+xpu
+mlflow_version: 3.11.1
+model_id: m-8bdeffa9c7944f9494cd07ab2b5ca780
+model_size_bytes: 206785
+model_uuid: m-8bdeffa9c7944f9494cd07ab2b5ca780
+prompts: null
+run_id: 253a3ecf76d64b8881377b6aa0c58a71
+utc_time_created: '2026-04-23 16:18:13.051875'
