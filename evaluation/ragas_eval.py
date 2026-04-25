@@ -4,6 +4,7 @@
 Referência: Es et al. (2024) — RAGAS: Automated Evaluation of Retrieval
             Augmented Generation. https://arxiv.org/abs/2309.15217
 """
+
 import json
 import logging
 
@@ -40,12 +41,14 @@ def evaluate_rag_pipeline(
     results = []
     for item in golden_set:
         answer, contexts = rag_fn(item["query"])
-        results.append({
-            "question": item["query"],
-            "answer": answer,
-            "contexts": contexts,
-            "ground_truth": item["expected_answer"],
-        })
+        results.append(
+            {
+                "question": item["query"],
+                "answer": answer,
+                "contexts": contexts,
+                "ground_truth": item["expected_answer"],
+            }
+        )
 
     dataset = Dataset.from_list(results)
 

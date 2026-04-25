@@ -4,6 +4,7 @@
 Referência: OWASP Top 10 for LLM Applications (2025)
             https://owasp.org/www-project-top-10-for-large-language-model-applications/
 """
+
 import logging
 import re
 
