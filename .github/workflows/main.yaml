@@ -1,0 +1,59 @@
+name: Datathon CI
+
+on:
+  push:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "evaluation/**"
+      - "pyproject.toml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "evaluation/**"
+      - "pyproject.toml"
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "pyproject.toml"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run Black (format check)
+        run: black src/ tests/ evaluation/ --check
+
+      - name: Run Ruff (lint)
+        run: ruff check src/ tests/ evaluation/
+
+      - name: Create reports directory
+        run: mkdir -p reports
+
+      - name: Run Pytest
+        run: |
+          pytest tests/ -x \
+            --cov=src \
+            --cov-report=xml \
+            --cov-fail-under=80 \
+            --junitxml=reports/test-results.xml
+
+      - name: Upload coverage and test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            reports/test-results.xml
+            coverage.xml
