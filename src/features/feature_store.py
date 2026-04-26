@@ -1,17 +1,23 @@
+"""
+Implementação do Feature Store (Redis) compatível com o modelo de 11 features.
+Garante a persistência incremental e a disponibilidade de dados 
+para a inferência em tempo real.
+"""
 import logging
+import json
 import redis
 import yfinance as yf
 import requests
 import pandas as pd
 from datetime import timedelta
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-logger = logging.getLogger(__name__)
+# Importamos a engenharia de features para garantir que o Store guarde os dados processados
+from src.features.feature_engineering import compute_features
 
+logger = logging.getLogger(__name__)
 
 class RedisFeatureStore:
     def __init__(self, host="redis", port=6379, db=0):
-        # Conexão com o serviço Redis do Docker
         try:
             self.client = redis.Redis(
                 host=host, port=port, db=db, decode_responses=True
@@ -22,66 +28,80 @@ class RedisFeatureStore:
             logger.error(f"Erro ao conectar ao Redis: {e}")
             raise
 
-    def upsert_incremental(self, ticker: str, novos_dados: pd.DataFrame):
+    def upsert_incremental(self, ticker: str, df_processado: pd.DataFrame):
         """
-        Implementa o GAP 03: Upsert Incremental sem destruir o store.
-        Usa um Hash do Redis para armazenar as datas como chaves.
+        Implementa o GAP 03: Upsert de todas as 11 features sem destruir o histórico.
+        Guarda cada linha como um objeto JSON dentro do Hash do Redis.
         """
         chave_hash = f"features:{ticker}"
-
-        # Transformamos o DataFrame em um dicionário {data: preço}
-        # O Redis HSET aceita múltiplos pares chave-valor de uma vez
-        updates = {str(d.date()): float(v) for d, v in novos_dados["Close"].items()}
+        
+        # Transformamos o DataFrame em um dicionário de JSONs: {data: "JSON_da_linha"}
+        # Orient='index' cria um dict onde a chave é o timestamp e o valor são as colunas
+        dados_dict = df_processado.to_dict(orient='index')
+        
+        updates = {}
+        for data_ts, colunas in dados_dict.items():
+            data_str = str(data_ts.date())
+            # Serializamos todas as 11 colunas em uma string JSON
+            updates[data_str] = json.dumps(colunas)
 
         if updates:
-            # HSET realiza o Upsert: se a data existe, atualiza; se não, cria.
-            # Nunca usamos FLUSHALL ou DEL aqui.
+            # HSET realiza o Upsert (Update + Insert) atómico
             self.client.hset(chave_hash, mapping=updates)
-
-            # Definimos um TTL (Time-To-Live) para o conjunto inteiro.
-            # Se o pipeline parar por mais de 7 dias, os dados expiram por segurança.
+            
+            # TTL de segurança (7 dias) para evitar dados obsoletos
             self.client.expire(chave_hash, timedelta(days=7))
-
-            logger.info(f"✅ {ticker}: Upsert de {len(updates)} registros concluído.")
+            logger.info(f"✅ {ticker}: Upsert de {len(updates)} registros (11 features) concluído.")
 
     def obter_janela_predicao(self, ticker: str, window_size: int = 30):
-        """Busca os últimos N dias para alimentar o modelo LSTM."""
+        """
+        Busca os últimos N dias processados para alimentar o modelo LSTM.
+        Reconstrói a matriz [window_size, 11] a partir do JSON.
+        """
         chave_hash = f"features:{ticker}"
-
-        # Buscamos todos os dados do Hash
         todos_dados = self.client.hgetall(chave_hash)
 
         if not todos_dados:
             raise ValueError(f"Ticker {ticker} não encontrado no Store.")
 
-        # Ordenamos pelas datas e pegamos os últimos 'window_size' registros
+        # Ordenar datas e pegar os últimos N registros
         datas_ordenadas = sorted(todos_dados.keys())
         ultimas_datas = datas_ordenadas[-window_size:]
 
-        precos = [float(todos_dados[d]) for d in ultimas_datas]
+        # Desserializar os JSONs para listas de valores numéricos
+        matriz_features = []
+        for d in ultimas_datas:
+            linha_dict = json.loads(todos_dados[d])
+            # Garante que a ordem das colunas é a mesma do FEATURE_COLS
+            valores = list(linha_dict.values())
+            matriz_features.append(valores)
 
-        if len(precos) < window_size:
-            raise ValueError(f"Dados insuficientes: {len(precos)}/{window_size}")
+        if len(matriz_features) < window_size:
+            raise ValueError(f"Dados insuficientes no Redis: {len(matriz_features)}/{window_size}")
 
-        return precos
+        return matriz_features
 
 
 def executar_atualizacao_diaria():
+    """Script disparado pelo cron ou CI/CD para alimentar o Store."""
     store = RedisFeatureStore()
     ticker = "PETR4.SA"
 
-    # Coleta de dados (com o disfarce de navegador para o Docker)
     session = requests.Session()
     session.headers.update({"User-Agent": "Mozilla/5.0"})
 
-    logger.info("Coletando dados recentes para o Store...")
+    logger.info("Coletando e processando dados para o Store...")
     tkt = yf.Ticker(ticker, session=session)
-    dados = tkt.history(period="1mo")  # Pega o último mês para garantir o incremental
+    
+    # Pegamos 60 dias para garantir que o compute_features tenha dados para as Médias Móveis (SMA50)
+    dados_brutos = tkt.history(period="3mo")
 
-    if not dados.empty:
-        store.upsert_incremental(ticker, dados)
+    if not dados_brutos.empty:
+        # Aplicamos a engenharia de features antes de salvar no Redis
+        dados_processados = compute_features(dados_brutos)
+        store.upsert_incremental(ticker, dados_processados)
     else:
-        logger.error("Falha na coleta: Ingestão retornou vazio.")
+        logger.error("Falha na coleta: API retornou vazio.")
 
 
 if __name__ == "__main__":
