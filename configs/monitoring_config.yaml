@@ -1,0 +1,54 @@
+# Configuração de monitoramento e drift detection
+
+# ==========================================
+# 1. MONITORAMENTO DO MODELO PREDITIVO (LSTM)
+# ==========================================
+drift:
+  psi_warning: 0.1
+  psi_critical: 0.2
+  check_interval_minutes: 60
+  reference_window: 1000
+  min_samples: 100
+
+quality_gate:
+  min_improvement_mae: 0.005
+  ks_test_alpha: 0.05
+  sigma_tolerance: 0.5
+
+# ==========================================
+# 2. MONITORAMENTO OPERACIONAL
+# ==========================================
+prometheus:
+  port: 9090
+  metrics_path: /metrics
+  scrape_interval: 15s
+
+alerting:
+  slack_webhook: ""       # Configurar via .env
+  email_to: ""
+  rules:
+    - name: "high_prediction_error"
+      condition: "sigma_error > 0.5"
+      severity: "critical"
+    - name: "data_drift_detected"
+      condition: "psi > 0.2"
+      severity: "critical" # Atualizado para critical conforme regra de retreino
+    - name: "model_latency_high"
+      condition: "p99_latency_ms > 500"
+      severity: "warning"
+
+# ==========================================
+# 3. QUALIDADE E SEGURANÇA DO AGENTE LLM
+# ==========================================
+llm_quality_gate:
+  # RAGAS: Thresholds para as 4 métricas obrigatórias da Etapa 3
+  ragas_faithfulness: 0.8
+  ragas_answer_relevancy: 0.8
+  ragas_context_precision: 0.7
+  ragas_context_recall: 0.7
+
+security_guardrails:
+  # OWASP Top 10 para LLMs: Limites de mitigação da Etapa 4
+  max_input_tokens: 4096
+  pii_detection_enabled: true
+  block_prompt_injection: true

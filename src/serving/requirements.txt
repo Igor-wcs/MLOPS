@@ -108,7 +108,6 @@ matplotlib==3.10.9
 matplotlib-inline==0.2.1
 mdurl==0.1.2
 mistune==3.2.0
--e git+ssh://git@github.com/Gcarmnonapy7/project_w.git@9b800cf6572458673ff44983afc863f25b5f505a#egg=ml_llm_system
 mlflow==2.11.3
 mpmath==1.3.0
 msgspec==0.21.1

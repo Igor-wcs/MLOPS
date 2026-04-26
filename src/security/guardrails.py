@@ -1,15 +1,14 @@
-# src/security/guardrails.py
-"""Guardrails de segurança para input e output do agente.
+"""src/security/guardrails.py
 
-Referência: OWASP Top 10 for LLM Applications (2025)
-            https://owasp.org/www-project-top-10-for-large-language-model-applications/
+Guardrails de segurança para input e output do agente.
+Implementa proteções contra o OWASP Top 10 for LLM Applications e conformidade LGPD.
 """
 
 import logging
 import re
 
-from presidio_analyzer import AnalyzerEngine
-from presidio_anonymizer import AnonymizerEngine
+# Importa o detector otimizado e focado no Brasil que criamos em pii_detection.py
+from src.security.pii_detection import PiiDetector
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 class InputGuardrail:
     """Valida e sanitiza input do usuário antes de enviar ao LLM."""
 
-    # Padrões comuns de prompt injection
+    # Padrões expandidos para mitigar LLM01: Prompt Injection e Jailbreak
     INJECTION_PATTERNS = [
         r"ignore\s+(all\s+)?previous\s+instructions",
         r"you\s+are\s+now\s+a",
@@ -25,16 +24,18 @@ class InputGuardrail:
         r"<\|im_start\|>",
         r"\[INST\]",
         r"forget\s+(everything|all|your\s+instructions)",
+        r"act\s+as\s+(a\s+)?",
+        r"pretend\s+you\s+are",
     ]
 
-    def __init__(self, allowed_topics: list[str] | None = None):
-        self.allowed_topics = allowed_topics or []
+    def __init__(self, max_length: int = 4096):
+        self.max_length = max_length
         self._compiled_patterns = [
             re.compile(p, re.IGNORECASE) for p in self.INJECTION_PATTERNS
         ]
 
     def validate(self, user_input: str) -> tuple[bool, str]:
-        """Valida input do usuário.
+        """Valida input do usuário contra injeções e context stuffing.
 
         Args:
             user_input: Texto do usuário.
@@ -46,22 +47,24 @@ class InputGuardrail:
         for pattern in self._compiled_patterns:
             if pattern.search(user_input):
                 logger.warning("Prompt injection detectado: %s", user_input[:100])
-                return False, "Input bloqueado: padrão suspeito detectado."
+                return False, "Input bloqueado: padrão de instrução suspeito detectado."
 
-        # Check 2: Tamanho máximo (evitar context stuffing)
-        if len(user_input) > 4096:
-            return False, "Input bloqueado: excede tamanho máximo (4096 chars)."
+        # Check 2: Tamanho máximo (evitar context stuffing/DoS - OWASP LLM04)
+        if len(user_input) > self.max_length:
+            return (
+                False,
+                f"Input bloqueado: excede tamanho máximo permitido ({self.max_length} chars).",
+            )
 
         return True, "OK"
 
 
 class OutputGuardrail:
-    """Valida e sanitiza output do LLM antes de retornar ao usuário."""
+    """Valida e sanitiza output do LLM antes de retornar ao usuário (LGPD)."""
 
     def __init__(self, language: str = "pt"):
-        self.analyzer = AnalyzerEngine()
-        self.anonymizer = AnonymizerEngine()
-        self.language = language
+        # Instancia o detector que já contém o Lazy Loading e as regras do Brasil
+        self.detector = PiiDetector(language=language)
 
     def sanitize(self, llm_output: str) -> str:
         """Remove PII do output do LLM.
@@ -70,20 +73,14 @@ class OutputGuardrail:
             llm_output: Texto gerado pelo LLM.
 
         Returns:
-            Texto sanitizado.
+            Texto sanitizado com placeholders (ex: <BR_CPF>, <PERSON>).
         """
-        results = self.analyzer.analyze(
-            text=llm_output,
-            language=self.language,
-            entities=["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "BR_CPF"],
-        )
+        # A nossa classe PiiDetector já escaneia e anonimiza com segurança
+        anonymized_text = self.detector.anonymize(llm_output)
 
-        if results:
-            logger.warning("PII detectado no output: %d entidades", len(results))
-            anonymized = self.anonymizer.anonymize(
-                text=llm_output,
-                analyzer_results=results,
+        if anonymized_text != llm_output:
+            logger.info(
+                "OutputGuardrail: Dados sensíveis foram mascarados antes da resposta."
             )
-            return anonymized.text
 
-        return llm_output
+        return anonymized_text

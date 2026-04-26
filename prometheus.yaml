@@ -1,8 +1,0 @@
-global:
-  scrape_interval: 5s # Coleta dados a cada 5 segundos
-
-scrape_configs:
-  - job_name: 'fastapi-app'
-    static_configs:
-      - targets: ['airflow-webserver:8080'] # Se a API rodar no mesmo container
-     

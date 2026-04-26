@@ -44,9 +44,7 @@ try:
         run_id=run_id, artifact_path="scaler.pkl"
     )
     scaler = joblib.load(local_scaler_path)
-    print(
-        f"✅ Modelo (Versão {ultima_versao.version}) e Scaler carregados com sucesso!"
-    )
+    print(f"Modelo (Versão {ultima_versao.version}) e Scaler carregados com sucesso!")
 
 except Exception as e:
     print(f"Erro ao carregar MLflow: {e}")
