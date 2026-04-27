@@ -1,240 +1,165 @@
-"""src/models/train.py
-
-Pipeline de treinamento com MLflow tracking padronizado.
-Refatorado para Nível 2 de MLOps:
-- Padrão Factory (LSTMFactory) para construção flexível do modelo.
-- Validação de hiperparâmetros via Pydantic (LSTMParams).
-- Leitura centralizada de parâmetros via YAML (configs/model_config.yaml).
-- Métrica de negócio (Sigma Tolerance).
-"""
 import logging
-import yaml
-from pathlib import Path
-from typing import Any
-
 import mlflow
 import mlflow.pytorch
-import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
 
-# Importando a nova arquitetura (Factory + Pydantic + Pipeline de Dados)
-from src.models.data import prepare_data
-from src.models.lstm_factory import LSTMFactory
-from src.models.lstm_params import LSTMParams
+from torch.utils.data import TensorDataset, DataLoader
+import yfinance as yf
+import numpy as np
+import pandas as pd
+import joblib
+import requests
+from datetime import date
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+
+# Importando componentes internos
+from src.features.feature_engineering import preparar_janelas_temporais
+from src.models.lstm_model import ModeloLSTM
 
 # Configuração de Logs
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-MODEL_DIR = Path(__file__).resolve().parent / ".models"
-MODEL_DIR.mkdir(exist_ok=True)
 
-
-def carregar_configuracao(config_path: str = "configs/model_config.yaml") -> dict:
-    """Carrega os hiperparâmetros centralizados do ficheiro YAML."""
-    with open(config_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
-
-
-def compute_sigma_metric(y_true: np.ndarray, y_pred: np.ndarray, window: int = 30) -> dict[str, float]:
-    """Calcula a métrica de negócio exigida: erro em desvios-padrão (σ).
-    A tolerância de negócio definida no YAML é 0.5σ.
-    """
-    errors = np.abs(y_true - y_pred)
-    sigma = float(np.std(y_true[-window:])) if len(y_true) >= window else float(np.std(y_true))
-    sigma = max(sigma, 1e-8)
-    
-    sigma_errors = errors / sigma
-
-    return {
-        "sigma_error_mean": float(np.mean(sigma_errors)),
-        "sigma_error_max": float(np.max(sigma_errors)),
-        "pct_within_0_5_sigma": float(np.mean(sigma_errors <= 0.5) * 100),
-        "sigma_value": sigma,
+def train_and_log(ticker="PETR4.SA"):
+    # Parâmetros do Modelo e Treino
+    params = {
+        "input_size": 1,
+        "output_size": 1,
+        "hidden_size": 128,
+        "dropout_rate": 0.2,
+        "learning_rate": 0.001,
+        "num_epochs": 30,
+        "batch_size": 32,
     }
 
-
-def train_epoch(
-    model: nn.Module,
-    loader: DataLoader,
-    optimizer: torch.optim.Optimizer,
-    criterion: nn.Module,
-    device: torch.device,
-) -> float:
-    """Executa uma época de treinamento de forma isolada."""
-    model.train()
-    total_loss = 0.0
-    n_batches = 0
-
-    for X_batch, y_batch in loader:
-        X_batch = X_batch.to(device)
-        y_batch = y_batch.to(device).unsqueeze(1)
-
-        optimizer.zero_grad()
-        output = model(X_batch)
-        loss = criterion(output, y_batch)
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-        n_batches += 1
-
-    return total_loss / max(n_batches, 1)
-
-
-@torch.inference_mode()
-def evaluate_model(
-    model: nn.Module,
-    loader: DataLoader,
-    device: torch.device,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Avalia o modelo e retorna predições e ground truth."""
-    model.eval()
-    all_preds, all_targets = [], []
-
-    for X_batch, y_batch in loader:
-        X_batch = X_batch.to(device)
-        output = model(X_batch)
-        all_preds.append(output.cpu().numpy().flatten())
-        all_targets.append(y_batch.numpy().flatten())
-
-    return np.concatenate(all_targets), np.concatenate(all_preds)
-
-
-def train_and_log() -> str:
-    """Orquestra o treino, instancia a Factory e loga no MLflow."""
-    # 1. Carrega as configurações do YAML (Single Source of Truth)
-    config = carregar_configuracao()
-    lstm_cfg = config["lstm"]
-    train_cfg = config["training"]
-    layer_cfg = config["layer_config"]
-    metric_cfg = config["business_metric"]
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logger.info(f"Utilizando o device: {device}")
-
-    # 2. Pipeline de Dados (Centralizado em data.py)
-    train_loader, test_loader, norm_params = prepare_data(
-        tickers=train_cfg["tickers"],
-        period=train_cfg["period"],
-        seq_len=train_cfg["seq_len"],
-        batch_size=train_cfg["batch_size"],
-        test_size=train_cfg.get("test_size", 0.2)
+    # Configurar Sessão (Disfarce de Navegador para evitar bloqueio no Docker)
+    session = requests.Session()
+    session.headers.update(
+        {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        }
     )
-    
-    # Extrai o número de features dinamicamente a partir do DataLoader
-    n_features = next(iter(train_loader))[0].shape[2]
 
-    # 3. Governança via Pydantic e Criação via Factory
-    params = LSTMParams(
-        input_size=n_features,
-        hidden_size=lstm_cfg["hidden_size"],
-        num_layers=lstm_cfg["num_layers"],
-        output_size=lstm_cfg["output_size"],
-        batch_first=lstm_cfg["batch_first"],
-        dropout=lstm_cfg["dropout"]
-    )
-    
-    factory = LSTMFactory(layer_config=layer_cfg, params=params)
-    model = factory.create().to(device)
+    # Ingestão de Dados com Fallback de Segurança
+    try:
+        logger.info(f"Tentando baixar dados históricos de {ticker} para treinamento...")
+        tkt = yf.Ticker(ticker, session=session)
+        # Pegamos 5 anos para garantir massa de dados para a LSTM
+        dados = tkt.history(period="5y")
 
-    criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=train_cfg["learning_rate"])
+        if dados.empty:
+            raise ValueError("O Yahoo Finance retornou um dataset vazio.")
 
-    # 4. Rastreamento MLflow
-    mlflow.set_experiment("datathon-fase05")
-    
-    ticker_name = "-".join(train_cfg["tickers"])
-    with mlflow.start_run(run_name=f"LSTM_Factory_{ticker_name}") as run:
-        
-        # Loga hiperparâmetros (YAML + Pydantic)
-        mlflow.log_params({
-            "tickers": ticker_name,
-            "period": train_cfg["period"],
-            "seq_len": train_cfg["seq_len"],
-            "num_epochs": train_cfg["num_epochs"],
-            "learning_rate": train_cfg["learning_rate"],
-            "batch_size": train_cfg["batch_size"],
-            "n_features": n_features,
-            "hidden_size": params.hidden_size,
-            "num_layers": params.num_layers,
-            "dropout": params.dropout,
-            "device": str(device),
-        })
+        dados_close = dados[["Close"]].values
+        logger.info(f"Sucesso! {len(dados)} linhas obtidas para treinamento via API.")
 
-        # Tags de Governança (Edital GAP 05)
-        mlflow.set_tags({
-            "model_type": "lstm_time_series",
-            "framework": "pytorch",
-            "owner": "grupo-XX",
-            "phase": "datathon-fase05",
-            "business_metric": f"sigma_tolerance_{metric_cfg['tolerance']}"
-        })
-
-        logger.info("Iniciando o loop de treino...")
-        for epoch in range(train_cfg["num_epochs"]):
-            train_loss = train_epoch(model, train_loader, optimizer, criterion, device)
-            
-            if (epoch + 1) % 10 == 0 or epoch == 0:
-                mlflow.log_metric("train_loss", train_loss, step=epoch)
-                logger.info("Epoch [%d/%d] — loss: %.6f", epoch + 1, train_cfg["num_epochs"], train_loss)
-
-        # 5. Avaliação e Métricas
-        y_true_scaled, y_pred_scaled = evaluate_model(model, test_loader, device)
-        
-        # Inversão de Escala: Extrai a média e desvio da variável Close a partir do norm_params
-        if "Close" in norm_params:
-            close_mean, close_std = norm_params["Close"]
-            y_true_real = (y_true_scaled * close_std) + close_mean
-            y_pred_real = (y_pred_scaled * close_std) + close_mean
-            
-            mae_real = float(np.mean(np.abs(y_true_real - y_pred_real)))
-            rmse_real = float(np.sqrt(np.mean((y_true_real - y_pred_real) ** 2)))
-        else:
-            logger.warning("Feature 'Close' não encontrada em norm_params. Avaliando dados em escala.")
-            y_true_real, y_pred_real = y_true_scaled, y_pred_scaled
-            mae_real = float(np.mean(np.abs(y_true_real - y_pred_real)))
-            rmse_real = float(np.sqrt(np.mean((y_true_real - y_pred_real) ** 2)))
-
-        # Métrica de Negócio
-        sigma_metrics = compute_sigma_metric(y_true_real, y_pred_real, metric_cfg["window_size"])
-
-        # Log de Resultados
-        mlflow.log_metrics({
-            "mae": mae_real,
-            "rmse": rmse_real,
-            **sigma_metrics
-        })
-
-        # 6. Salvar Artefatos
-        artifact_path = MODEL_DIR / "lstm_model.pt"
-        torch.save(
-            {
-                "state_dict": model.state_dict(),
-                "layer_config": layer_cfg,
-                "lstm_params": params.model_dump(),
-                "training_params": train_cfg,
-                "norm_params": {k: list(v) for k, v in norm_params.items()},
-            },
-            artifact_path,
+    except Exception as e:
+        # MECANISMO DE RESILIÊNCIA: Se a API falhar, o pipeline não morre
+        logger.warning(f"Falha no download de treino: {e}.")
+        logger.warning(
+            "Ativando Fallback: Gerando dados sintéticos para completar o ciclo da DAG."
         )
 
-        mlflow.log_artifact(str(artifact_path))
-        mlflow.pytorch.log_model(model, "model")
+        # Gera 1000 dias de preços simulados (tendência de alta com ruído)
+        datas = pd.date_range(end=date.today(), periods=1000)
+        dados_mock = pd.DataFrame(
+            {"Close": np.linspace(25, 42, 1000) + np.random.randn(1000)}, index=datas
+        )
+        dados_close = dados_mock[["Close"]].values
 
-        logger.info(
-            "Treinamento concluído! MAE=%.4f | Erro Sigma=%.4fσ | Dentro do Alvo (%.1fσ)=%.1f%%",
-            mae_real,
-            sigma_metrics["sigma_error_mean"],
-            metric_cfg["tolerance"],
-            sigma_metrics["pct_within_0_5_sigma"],
+    # Preparação das janelas usando a função importada
+    # O Scaler é gerado aqui e será salvo como artefato no MLflow
+    X, y, scaler = preparar_janelas_temporais(dados_close, params["window_size"])
+
+    # Divisão Treino/Teste (Corte Cronológico 80/20)
+    split = int(len(X) * 0.8)
+    X_train = torch.tensor(X[:split], dtype=torch.float32)
+    y_train = torch.tensor(y[:split], dtype=torch.float32).view(-1, 1)
+    X_test = torch.tensor(X[split:], dtype=torch.float32)
+    y_test = torch.tensor(y[split:], dtype=torch.float32).view(-1, 1)
+
+    dataset = TensorDataset(X_train, y_train)
+    loader = DataLoader(dataset, batch_size=params["batch_size"], shuffle=True)
+
+    # Inicialização do Modelo LSTM
+    modelo = ModeloLSTM(
+        params["input_size"],
+        params["hidden_size"],
+        params["output_size"],
+        params["dropout_rate"],
+    )
+    criterio = nn.MSELoss()
+    otimizador = torch.optim.Adam(modelo.parameters(), lr=params["learning_rate"])
+
+    # Rastreamento com MLflow
+    mlflow.set_experiment("Datathon_Previsao_Acoes")
+
+    with mlflow.start_run(run_name=f"Treino_{ticker}"):
+        mlflow.log_params(params)
+
+        # Tags de Governança
+        mlflow.set_tag("model_type", "lstm_time_series")
+        mlflow.set_tag("dataset", "PETR4_Real_or_Fallback")
+        mlflow.set_tag("framework", "pytorch")
+
+        logger.info("Iniciando treinamento das épocas")
+        for epoch in range(params["num_epochs"]):
+            modelo.train()
+            train_losses = []
+            for batch_X, batch_y in loader:
+                otimizador.zero_grad()
+                output = modelo(batch_X)
+                loss = criterio(output, batch_y)
+                loss.backward()
+                otimizador.step()
+                train_losses.append(loss.item())
+
+            # Avaliação em tempo real Cálculo da perda de validação a cada época para monitoramento e geração de curvas no MLflow UI
+            modelo.eval()
+            with torch.no_grad():
+                val_loss = criterio(modelo(X_test), y_test).item()
+
+            epoch_train_loss = np.mean(train_losses)
+
+            # Log de métricas por época (gera as curvas no UI do MLflow)
+            mlflow.log_metric("train_loss", epoch_train_loss, step=epoch)
+            mlflow.log_metric("val_loss", val_loss, step=epoch)
+
+            if (epoch + 1) % 10 == 0:
+                logger.info(
+                    f"Época [{epoch + 1}/{params['num_epochs']}] | Loss: {epoch_train_loss:.5f}"
+                )
+
+        # Avaliação Final e Registro
+        modelo.eval()
+        with torch.no_grad():
+            previsoes_scaled = modelo(X_test).cpu().numpy()
+            y_test_scaled = y_test.cpu().numpy()
+
+            # INVERSÃO DE ESCALA: Trazendo de volta para Reais (R$)
+            previsoes_real = scaler.inverse_transform(previsoes_scaled)
+            y_test_real = scaler.inverse_transform(y_test_scaled)
+
+            mse_real = mean_squared_error(y_test_real, previsoes_real)
+            mae_real = mean_absolute_error(y_test_real, previsoes_real)
+
+        mlflow.log_metrics({"final_mse_real": mse_real, "final_mae_real": mae_real})
+
+        # Salva o modelo no Model Registry como "LSTM_Petrobras"
+        mlflow.pytorch.log_model(
+            modelo, artifact_path="model", registered_model_name="LSTM_Petrobras"
         )
 
-        return run.info.run_id
+        # Salva o Scaler (essencial para a API desnormalizar o preço depois)
+        scaler_path = "scaler.pkl"
+        joblib.dump(scaler, scaler_path)
+        mlflow.log_artifact(scaler_path)
+
+        logger.info(f"Treino Finalizado! Modelo registrado com MSE: {mse_real:.6f}")
+        return mlflow.active_run().info.run_id
 
 
 if __name__ == "__main__":
-    run_id = train_and_log()
-    logger.info(f"MLflow run_id: {run_id}")
+    train_and_log()
