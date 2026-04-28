@@ -1,4 +1,5 @@
 import logging
+import yaml
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -7,7 +8,7 @@ import mlflow.pytorch
 import requests
 from datetime import date
 from evidently.report import Report
-from evidently.metric_preset import DataDriftPreset
+from evidently.metric_preset import DataDriftPreset, TargetDriftPreset
 from mlflow.tracking import MlflowClient
 
 # Importando a nossa preparação de dados
@@ -16,27 +17,30 @@ from src.features.feature_engineering import preparar_janelas_temporais
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+def load_configs() -> tuple[dict, dict]:
+    """Carrega as configurações centrais."""
+    with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
+        model_cfg = yaml.safe_load(f)
+    with open("configs/monitoring_config.yaml", "r", encoding="utf-8") as f:
+        mon_cfg = yaml.safe_load(f)
+    return model_cfg, mon_cfg
 
-def obter_modelo_producao():
-    """Busca a versão mais recente do modelo no MLflow Registry."""
-    logger.info("Buscando o modelo mais recente no Model Registry...")
+def obter_modelo_producao(model_name: str, device: torch.device):
+    """Busca a versão mais recente do modelo no MLflow Registry e aloca no device correto."""
+    logger.info(f"Buscando o modelo '{model_name}' no Registry...")
     client = MlflowClient()
 
     try:
-        # Busca todas as versões registradas para este nome
-        versoes = client.search_model_versions("name='LSTM_Petrobras'")
+        versoes = client.search_model_versions(f"name='{model_name}'")
         if not versoes:
-            logger.warning(
-                "Nenhum modelo encontrado no Registry. O primeiro treino ainda não ocorreu."
-            )
+            logger.warning("Nenhum modelo encontrado no Registry.")
             return None
 
-        # Identifica a versão mais alta
         ultima_versao = max(versoes, key=lambda v: int(v.version))
-        model_uri = f"models:/LSTM_Petrobras/{ultima_versao.version}"
+        model_uri = f"models:/{model_name}/{ultima_versao.version}"
 
         logger.info(f"Carregando Modelo Versão {ultima_versao.version}...")
-        modelo = mlflow.pytorch.load_model(model_uri)
+        modelo = mlflow.pytorch.load_model(model_uri).to(device)
         modelo.eval()
         return modelo
 
@@ -44,99 +48,97 @@ def obter_modelo_producao():
         logger.warning(f"Não foi possível carregar o modelo do MLflow: {e}")
         return None
 
-
-def gerar_relatorio_drift(ticker="PETR4.SA", window_size=30):
-    logger.info(f"Iniciando análise de Drift para {ticker}...")
-
-    # 1. Configurar Sessão Robusta (Disfarce de Navegador para evitar bloqueio no Docker)
-    session = requests.Session()
-    session.headers.update(
-        {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        }
+def gerar_relatorio_drift():
+    # 1. Carregamento de Configurações e Hardware
+    model_cfg, mon_cfg = load_configs()
+    ticker = model_cfg["data"]["ticker"]
+    window_size = model_cfg["data"]["window_size"]
+    
+    device = torch.device(
+        "xpu" if hasattr(torch, "xpu") and torch.xpu.is_available() 
+        else "cuda" if torch.cuda.is_available() else "cpu"
     )
+    
+    logger.info(f"Iniciando análise de Drift para {ticker} usando {device}...")
 
-    # 2. Tentar baixar dados reais do mercado
+    # 2. Obtenção Robusta de Dados
+    session = requests.Session()
+    session.headers.update({"User-Agent": "Mozilla/5.0"})
+
     try:
-        logger.info(f"Tentando baixar histórico de {ticker} via Yahoo Finance...")
         tkt = yf.Ticker(ticker, session=session)
+        # Usando o período de referência do YAML (ex: "1y" ou "2y")
         dados = tkt.history(period="2y")
-
-        if dados.empty:
-            raise ValueError("O Yahoo Finance retornou um dataset vazio.")
-
-        logger.info(f"Sucesso! {len(dados)} linhas baixadas da API.")
+        if dados.empty: raise ValueError("Dataset vazio.")
         dados_close = dados[["Close"]].values
-
     except Exception as e:
-        logger.warning(f"🚨 Falha na conexão com a API externa: {e}")
-        logger.warning(
-            "Ativando Fallback: Gerando dados sintéticos para garantir a continuidade da DAG."
-        )
-
+        logger.warning(f"Falha na API: {e}. Ativando Fallback Sintético.")
         datas_mock = pd.date_range(end=date.today(), periods=500)
-        dados_mock = pd.DataFrame(
-            {"Close": np.linspace(32, 38, 500) + np.random.randn(500)}, index=datas_mock
-        )
-        dados_close = dados_mock[["Close"]].values
+        dados_close = (np.linspace(32, 38, 500) + np.random.randn(500)).reshape(-1, 1)
 
-    # 3. Preparar as janelas (Processamento isolado)
+    # 3. Preparação das janelas temporais
     X, y, _ = preparar_janelas_temporais(dados_close, window_size)
 
-    # 4. Dividir Referência (80%) vs Atual (20%)
-    split = int(len(X) * 0.8)
+    # 4. Split de Referência (Passado) vs Atual (Recente)
+    # Aqui ajustamos para pegar os últimos 30 dias de amostras como 'current'
+    split = len(X) - 30 
     X_ref_np, X_curr_np = X[:split], X[split:]
 
-    colunas_features = [f"preco_dia_menos_{i}" for i in range(window_size, 0, -1)]
+    colunas_features = [f"preco_t_minus_{i}" for i in range(window_size, 0, -1)]
     df_ref = pd.DataFrame(X_ref_np.reshape(-1, window_size), columns=colunas_features)
     df_curr = pd.DataFrame(X_curr_np.reshape(-1, window_size), columns=colunas_features)
 
-    # 5. Tentar gerar predições (Se o modelo existir)
-    modelo = obter_modelo_producao()
+    # 5. Geração de Predições para Target Drift (Sua excelente sacada)
+    nome_modelo = model_cfg["paths"]["registered_model_name"]
+    modelo = obter_modelo_producao(nome_modelo, device)
 
+    # O Evidently procura pela coluna chamada 'prediction'
     if modelo is not None:
         try:
             with torch.no_grad():
-                logger.info(
-                    "Gerando predições com o modelo Champion para análise de desvio..."
-                )
-                preds_ref = modelo(torch.tensor(X_ref_np, dtype=torch.float32)).numpy()
-                preds_curr = modelo(
-                    torch.tensor(X_curr_np, dtype=torch.float32)
-                ).numpy()
+                preds_ref = modelo(torch.tensor(X_ref_np, dtype=torch.float32).to(device)).cpu().numpy()
+                preds_curr = modelo(torch.tensor(X_curr_np, dtype=torch.float32).to(device)).cpu().numpy()
 
-            df_ref["predicao_modelo"] = preds_ref
-            df_curr["predicao_modelo"] = preds_curr
+            df_ref["prediction"] = preds_ref
+            df_curr["prediction"] = preds_curr
+            logger.info("Predições geradas. Analisando Data Drift e Prediction Drift.")
+            metrics_preset = [DataDriftPreset(), TargetDriftPreset()]
         except Exception as e:
-            logger.error(
-                f"Erro ao gerar predições: {e}. Prosseguindo apenas com análise de features."
-            )
+            logger.error(f"Erro nas predições: {e}. Analisando apenas Features.")
+            metrics_preset = [DataDriftPreset()]
     else:
-        logger.info(
-            "Pulando análise de predições. O relatório focarão apenas no Drift das Features (preços)."
-        )
+        logger.info("Sem modelo. Analisando apenas Feature Drift.")
+        metrics_preset = [DataDriftPreset()]
 
-    # 6. Rodar o Evidently Report
-    logger.info("Executando Data Drift Report (Evidently)...")
-    report = Report(metrics=[DataDriftPreset()])
-    report.run(reference_data=df_ref, current_data=df_curr)
+    # 6. Rastreamento MLflow e Execução Evidently
+    mlflow.set_experiment(model_cfg["paths"]["experiment_name"])
+    
+    with mlflow.start_run(run_name="Monitoring_Drift_Evidently"):
+        mlflow.set_tag("phase", "datathon-fase05")
+        mlflow.set_tag("pipeline_step", "monitoring")
 
-    # 7. Salvar e Avaliar
-    caminho_relatorio = "drift_report_petr4.html"
-    report.save_html(caminho_relatorio)
+        report = Report(metrics=metrics_preset)
+        report.run(reference_data=df_ref, current_data=df_curr)
 
-    drift_result = report.as_dict()
-    drift_share = drift_result["metrics"][0]["result"]["share_of_drifted_columns"]
+        caminho_html = mon_cfg["paths"]["report_html"]
+        report.save_html(caminho_html)
+        
+        # Clipar relatório no MLflow
+        mlflow.log_artifact(caminho_html)
 
-    logger.info(f"Relatório gerado em: {caminho_relatorio}")
-    logger.info(f"Proporção de dados com drift: {drift_share * 100:.2f}%")
-
-    if drift_share > 0.2:
-        logger.warning("ALERTA: Degradação de dados detectada (> 20%).")
-    else:
-        logger.info("✅ Estabilidade de dados confirmada.")
-
+        # Extração e Log de Métricas
+        drift_result = report.as_dict()
+        drift_share = drift_result["metrics"][0]["result"]["share_of_drifted_columns"]
+        
+        mlflow.log_metric("drift_share", float(drift_share))
+        
+        retrain_th = mon_cfg["drift"]["retrain_threshold"]
+        if drift_share > retrain_th:
+            logger.warning(f"🚨 ALERTA CRÍTICO: Degradação detectada ({drift_share * 100:.1f}%). Necessário Retreino.")
+            mlflow.set_tag("status", "CRITICAL_DRIFT")
+        else:
+            logger.info(f"✅ Estabilidade confirmada. Drift atual: {drift_share * 100:.1f}%.")
+            mlflow.set_tag("status", "HEALTHY")
 
 if __name__ == "__main__":
     gerar_relatorio_drift()

@@ -4,5 +4,13 @@ stages:
     deps:
       - data/raw
       - src/features/feature_engineering.py
+      - configs/model_config.yaml
     outs:
       - data/processed
+
+  train:
+    cmd: python -m src.models.train
+    deps:
+      - data/processed
+      - src/models/train.py
+      - configs/model_config.yaml

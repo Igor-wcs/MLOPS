@@ -1,14 +1,17 @@
-# Configuração de monitoramento e drift detection
-
 # ==========================================
-# 1. MONITORAMENTO DO MODELO PREDITIVO (LSTM)
+# 1. MONITORAMENTO DO MODELO PREDITIVO E DRIFT
 # ==========================================
 drift:
-  psi_warning: 0.1
-  psi_critical: 0.2
+  warning_threshold: 0.1      
+  retrain_threshold: 0.2      
   check_interval_minutes: 60
-  reference_window: 1000
+  reference_period: "1y"      # Período base para a API do yfinance extrair dados
+  current_period: "1mo"       # Janela de análise em produção
   min_samples: 100
+
+paths:
+  report_html: "drift_report.html"
+  report_json: "drift_report.json"
 
 quality_gate:
   min_improvement_mae: 0.005
@@ -16,7 +19,7 @@ quality_gate:
   sigma_tolerance: 0.5
 
 # ==========================================
-# 2. MONITORAMENTO OPERACIONAL
+#     MONITORAMENTO OPERACIONAL 
 # ==========================================
 prometheus:
   port: 9090
@@ -24,31 +27,31 @@ prometheus:
   scrape_interval: 15s
 
 alerting:
-  slack_webhook: ""       # Configurar via .env
+  slack_webhook: ""       # Configurar via .env em Produção
   email_to: ""
   rules:
     - name: "high_prediction_error"
       condition: "sigma_error > 0.5"
       severity: "critical"
     - name: "data_drift_detected"
-      condition: "psi > 0.2"
-      severity: "critical" # Atualizado para critical conforme regra de retreino
+      condition: "share_of_drifted_columns > 0.2"
+      severity: "critical"
     - name: "model_latency_high"
       condition: "p99_latency_ms > 500"
       severity: "warning"
 
 # ==========================================
-# 3. QUALIDADE E SEGURANÇA DO AGENTE LLM
+#   QUALIDADE E SEGURANÇA DO AGENTE LLM
 # ==========================================
 llm_quality_gate:
-  # RAGAS: Thresholds para as 4 métricas obrigatórias da Etapa 3
+  # RAGAS: Thresholds para as 4 métricas obrigatórias
   ragas_faithfulness: 0.8
   ragas_answer_relevancy: 0.8
   ragas_context_precision: 0.7
   ragas_context_recall: 0.7
 
 security_guardrails:
-  # OWASP Top 10 para LLMs: Limites de mitigação da Etapa 4
+  # OWASP Top 10 para LLMs: Parâmetros de mitigação
   max_input_tokens: 4096
   pii_detection_enabled: true
   block_prompt_injection: true

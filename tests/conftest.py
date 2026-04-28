@@ -1,18 +1,71 @@
-# tests/conftest.py
-"""Fixtures compartilhados para testes."""
+"""Fixtures globais para a suíte de testes (FastAPI, PyTorch, Features e LLM)."""
 
+import numpy as np
 import pandas as pd
 import pytest
+import torch
+from fastapi.testclient import TestClient
 
+# Importa a nossa API para habilitar testes de integração
+from src.serving.app import app
+
+# ==========================================
+# FIXTURES DE API E SERVING
+# ==========================================
+@pytest.fixture
+def client() -> TestClient:
+    """Cliente de teste do FastAPI para simular requisições HTTP."""
+    return TestClient(app)
+
+# ==========================================
+# FIXTURES DE DADOS E FEATURES (MOCKS)
+# ==========================================
+@pytest.fixture
+def sample_ohlcv_data() -> pd.DataFrame:
+    """Dados OHLCV sintéticos para testes (nunca dados reais - GAP 08)."""
+    np.random.seed(42)
+    n = 100
+    base_price = 150.0
+    prices = base_price + np.cumsum(np.random.randn(n) * 2)
+
+    return pd.DataFrame({
+        "Open": prices + np.random.randn(n) * 0.5,
+        "High": prices + np.abs(np.random.randn(n)) * 2,
+        "Low": prices - np.abs(np.random.randn(n)) * 2,
+        "Close": prices,
+        "Volume": np.random.randint(1_000_000, 50_000_000, size=n).astype(float),
+        "Ticker": "TEST",
+    })
 
 @pytest.fixture
-def sample_data() -> pd.DataFrame:
-    """Dados sintéticos para testes (nunca dados reais)."""
-    return pd.DataFrame(
+def sample_sequences() -> tuple[np.ndarray, np.ndarray]:
+    """Sequências sintéticas para testes do modelo PyTorch LSTM."""
+    np.random.seed(42)
+    n_samples, seq_len, n_features = 50, 30, 5
+    X = np.random.randn(n_samples, seq_len, n_features).astype(np.float32)
+    y = np.random.randn(n_samples).astype(np.float32)
+    return X, y
+
+@pytest.fixture
+def lstm_layer_config() -> dict[str, str]:
+    """Configuração de camadas padrão para os testes do Factory."""
+    return {"lstm1": "LSTM", "linear1": "Linear"}
+
+# ==========================================
+# FIXTURES DE AVALIAÇÃO (LLM / RAG)
+# ==========================================
+@pytest.fixture
+def golden_set_data() -> list[dict]:
+    """Golden set mínimo sintético para testes de avaliação RAGAS/Juiz."""
+    return [
         {
-            "feature_1": [0.1, 0.5, 0.9, 0.3, 0.7, 0.2, 0.8, 0.4],
-            "feature_2": [1.0, 2.0, 3.0, 4.0, 5.0, 1.5, 3.5, 2.5],
-            "feature_cat": ["A", "B", "A", "C", "B", "A", "C", "B"],
-            "target": [0, 1, 1, 0, 1, 0, 1, 0],
-        }
-    )
+            "question": "Qual o preço atual da AAPL?",
+            "ground_truth": "O preço atual da AAPL é $185.50.",
+            "contexts": ["AAPL fechou a $185.50 no último pregão."],
+        },
+        {
+            "question": "A MSFT está em tendência de alta?",
+            "ground_truth": "Sim, a MSFT está acima da SMA20 e SMA50.",
+            "contexts": ["MSFT: preço $420, SMA20=$415, SMA50=$408."],
+        },
+    ]

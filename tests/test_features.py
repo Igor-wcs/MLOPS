@@ -1,33 +1,28 @@
-# tests/test_features.py
-"""Testes de feature engineering — schema contracts."""
+"""Testes de feature engineering para séries temporais LSTM."""
 
-import pandera as pa
-from pandera import Column, DataFrameSchema
+import numpy as np
+import pytest
+from src.features.feature_engineering import preparar_janelas_temporais
 
-from src.features.feature_engineering import compute_features
+@pytest.fixture
+def serie_temporal_mock():
+    """Mock de uma série de preços de fechamento (100 dias)."""
+    return np.linspace(10, 110, 100)
 
-FEATURE_SCHEMA = DataFrameSchema(
-    {
-        "feature_1": Column(float, pa.Check.between(0, 1)),
-        "feature_2": Column(float, pa.Check.gt(0)),
-        "feature_1_x_feature_2": Column(float),
-    }
-)
+def test_dimensoes_janela_temporal(serie_temporal_mock):
+    """Garante que as dimensões do tensor X e array y estão corretas."""
+    window_size = 10
+    X, y, scaler = preparar_janelas_temporais(
+        serie_temporal_mock, window_size=window_size
+    )
+    
+    expected_samples = len(serie_temporal_mock) - window_size
+    assert X.shape == (expected_samples, window_size, 1), "Shape de X incorreto"
+    assert y.shape == (expected_samples,), "Shape de y incorreto"
 
-
-def test_schema_contract(sample_data):
-    """Features de saída devem respeitar o contrato de schema."""
-    result = compute_features(sample_data)
-    FEATURE_SCHEMA.validate(result)
-
-
-def test_no_nulls(sample_data):
-    """Nenhuma feature pode ter null após transformação."""
-    result = compute_features(sample_data)
-    assert result.isnull().sum().sum() == 0
-
-
-def test_row_count_preserved(sample_data):
-    """Número de registros deve ser preservado."""
-    result = compute_features(sample_data)
-    assert len(result) == len(sample_data)
+def test_escalonamento_limites(serie_temporal_mock):
+    """Garante que os dados passaram pelo MinMaxScaler e estão entre 0 e 1."""
+    X, y, scaler = preparar_janelas_temporais(serie_temporal_mock)
+    
+    assert np.min(X) >= 0.0, "Existem valores menores que 0 após o scaler"
+    assert np.max(X) <= 1.0, "Existem valores maiores que 1 após o scaler"

@@ -1,121 +1,211 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+import logging
+import joblib
+import yaml
 import mlflow.pytorch
+import mlflow.artifacts
 import torch
 import numpy as np
-import joblib
-import mlflow.artifacts
+from fastapi import FastAPI, HTTPException, Request, status, BackgroundTasks
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from mlflow.tracking import MlflowClient
 from prometheus_fastapi_instrumentator import Instrumentator
 
-# Importando o nosso novo Feature Store (Redis)
+# Importações Internas
 from src.features.feature_store import RedisFeatureStore
+from src.security.guardrails import input_guard, output_guard
+from src.models.train import train_and_log
 
-# Configuração do App
-app = FastAPI(title="API de Previsão PETR4 - Datathon")
+# Configuração de Logs
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
 
-# Instrumentação do Prometheus (GAP 01)
+# ==========================================
+#   ESTADO GLOBAL E CONFIGURAÇÃO
+# ==========================================
+
+tags_metadata = [
+    {"name": "Predição", "description": "Inferência de preços com Feature Store (Redis)."},
+    {"name": "Agente", "description": "Consulta ao agente ReAct LLM."},
+    {"name": "Treinamento", "description": "Disparo assíncrono do pipeline MLflow."},
+    {"name": "Configuração", "description": "Probes de Health e Readiness."},
+]
+
+app = FastAPI(
+    title="Datathon Fase 05 — Stock Price Prediction",
+    description="LSTM PyTorch + Agente LLM (Qwen) com governança total.",
+    version="1.0.0",
+    openapi_tags=tags_metadata,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Instrumentação Automática (Prometheus)
 Instrumentator().instrument(app).expose(app)
 
-# --- Inicialização do Feature Store (Redis) ---
-try:
-    # No Docker, o host se chama 'redis'. Se rodar local, mude para 'localhost'
-    feature_store = RedisFeatureStore(host="redis", port=6379)
-    print("Feature Store (Redis) conectado com sucesso!")
-except Exception as e:
-    print(f"Aviso: Não foi possível conectar ao Redis na inicialização: {e}")
-    feature_store = None
+model = None
+scaler = None
+config = None
+device = None
+feature_store = None
 
-# --- Carregamento do Modelo e do Scaler (MLflow) ---
-MODEL_URI = "models:/LSTM_Petrobras/latest"
+# ==========================================
+#    SCHEMAS
+# ==========================================
 
-try:
-    print(f"Carregando modelo de {MODEL_URI}...")
-    modelo = mlflow.pytorch.load_model(MODEL_URI)
-    modelo.eval()  # Modo de inferência
-
-    client = MlflowClient()
-    versoes = client.search_model_versions("name='LSTM_Petrobras'")
-    ultima_versao = max(versoes, key=lambda v: int(v.version))
-    run_id = ultima_versao.run_id
-
-    # Baixa o scaler salvo durante o treinamento
-    local_scaler_path = mlflow.artifacts.download_artifacts(
-        run_id=run_id, artifact_path="scaler.pkl"
-    )
-    scaler = joblib.load(local_scaler_path)
-    print(f"Modelo (Versão {ultima_versao.version}) e Scaler carregados com sucesso!")
-
-except Exception as e:
-    print(f"Erro ao carregar MLflow: {e}")
-    modelo = None
-    scaler = None
-
-
-@app.get("/")
-def home():
-    return {
-        "status": "API Online",
-        "modelo": "LSTM_Petrobras",
-        "feature_store": "Redis",
-    }
-
-
-# --- ROTA DE PREVISÃO (GAP 03 Compliant) ---
-class RequisicaoPrevisao(BaseModel):
+class PredictRequest(BaseModel):
     ticker: str = "PETR4.SA"
 
+class AgentRequest(BaseModel):
+    query: str
 
-@app.post("/predict")
-def predict(req: RequisicaoPrevisao):
-    if modelo is None or scaler is None:
-        raise HTTPException(
-            status_code=500, detail="Modelo ou Scaler não carregados no servidor."
-        )
+class AgentResponse(BaseModel):
+    answer: str
 
-    if feature_store is None:
-        raise HTTPException(
-            status_code=500, detail="Conexão com o Redis (Feature Store) indisponível."
+# ==========================================
+#    STARTUP E PROBES (Estilo Kubernetes)
+# ==========================================
+
+@app.on_event("startup")
+def startup_event():
+    """Inicializa configurações, hardware, Redis e baixa artefatos do MLflow."""
+    global model, scaler, config, device, feature_store
+    
+    try:
+        with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+            
+        device = torch.device(
+            "xpu" if hasattr(torch, "xpu") and torch.xpu.is_available() 
+            else "cuda" if torch.cuda.is_available() else "cpu"
         )
+        logger.info(f"Servidor inicializado com aceleração em: {device}")
+
+        try:
+            feature_store = RedisFeatureStore(host="redis", port=6379)
+        except Exception as e:
+            logger.warning(f"Aviso: Redis não acessível. Detalhe: {e}")
+
+        # Carregamento via MLflow Registry
+        nome_modelo = config["paths"]["registered_model_name"]
+        logger.info(f"Buscando modelo '{nome_modelo}' no MLflow Registry...")
+        
+        model = mlflow.pytorch.load_model(f"models:/{nome_modelo}/latest").to(device)
+        model.eval()
+
+        client = MlflowClient()
+        versoes = client.search_model_versions(f"name='{nome_modelo}'")
+        ultima_versao = max(versoes, key=lambda v: int(v.version))
+        
+        local_scaler_path = mlflow.artifacts.download_artifacts(
+            run_id=ultima_versao.run_id, artifact_path=config["paths"]["scaler_path"]
+        )
+        scaler = joblib.load(local_scaler_path)
+        logger.info("Artefatos de inferência carregados com sucesso.")
+
+    except Exception as e:
+        logger.error(f"Erro no startup: {e}")
+
+@app.get("/ready", tags=["Configuração"])
+async def readiness():
+    is_ready = model is not None and scaler is not None and feature_store is not None
+    return {
+        "status": "ready" if is_ready else "not_ready",
+        "device": str(device)
+    }
+
+@app.exception_handler(RequestValidationError)
+async def validation_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content=jsonable_encoder({"detail": exc.errors(), "message": "Parâmetros inválidos."}),
+    )
+
+# ==========================================
+#    ENDPOINTS CORE
+# ==========================================
+
+@app.post("/train", tags=["Treinamento"])
+async def trigger_training(background_tasks: BackgroundTasks):
+    """Dispara o pipeline de treinamento em background (sem travar a API)."""
+    background_tasks.add_task(train_and_log)
+    return {"message": "Treinamento assíncrono disparado com sucesso.", "status": "running"}
+
+@app.post("/predict", tags=["Predição"])
+def predict(req: PredictRequest):
+    if not model or not scaler or not feature_store:
+        raise HTTPException(status_code=503, detail="Serviço indisponível (Model/Redis não carregados).")
 
     try:
-        # Busca os últimos 30 dias direto do Redis (Sem Flush, via Upsert Incremental)
-        ultimos_30_precos = feature_store.obter_janela_predicao(
-            req.ticker, window_size=30
-        )
+        window_size = config["data"]["window_size"]
+        
+        #  Puxa do Feature Store
+        ultimos_precos = feature_store.obter_janela_predicao(req.ticker, window_size=window_size)
+        if len(ultimos_precos) != window_size:
+            raise ValueError("Janela de dados incompleta no Redis.")
 
-        # Normalização (De Reais para 0-1) usando o Scaler do MLflow
-        precos_np = np.array(ultimos_30_precos).reshape(-1, 1)
+        #  Processamento PyTorch
+        precos_np = np.array(ultimos_precos).reshape(-1, 1)
         precos_escalonados = scaler.transform(precos_np)
-
-        # Formatação para o PyTorch (batch_size, seq_len, input_size) -> (1, 30, 1)
+        
         tensor_entrada = torch.tensor(
-            precos_escalonados.reshape(1, 30, 1), dtype=torch.float32
-        )
+            precos_escalonados.reshape(1, window_size, config["model"]["input_size"]), 
+            dtype=torch.float32
+        ).to(device)
 
-        # Predição
         with torch.no_grad():
-            predicao_tensor = modelo(tensor_entrada)
-            resultado_escalonado = predicao_tensor.item()
+            predicao_tensor = model(tensor_entrada)
+            resultado_escalonado = predicao_tensor.cpu().item()
 
-        # Transformação Inversa (De 0-1 de volta para Reais)
         resultado_reais = scaler.inverse_transform([[resultado_escalonado]])[0][0]
 
         return {
             "ticker": req.ticker,
-            "previsao_reais": f"R$ {resultado_reais:.2f}",
-            "fonte_dados": "Redis Feature Store (Upsert Incremental)",
-            "observacao": "GAP 03 Resolvido - Risco de Janela Vazia Mitigado",
+            "predicted_price_brl": round(float(resultado_reais), 2),
+            "source": "Redis Feature Store"
         }
 
     except ValueError as ve:
-        # Tratamento de erro se a API for chamada antes do Airflow popular o Redis
-        raise HTTPException(status_code=404, detail=str(ve))
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Erro na inferência: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno no pipeline de predição.")
 
+@app.post("/agent", tags=["Agente"], response_model=AgentResponse)
+async def agent_query(data: AgentRequest):
+    """Consulta o agente ReAct protegido por Guardrails."""
+    
+    # 1. Barreira de Entrada (Input Guardrail - OWASP LLM01)
+    is_valid, reason = input_guard.validate(data.query)
+    if not is_valid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
 
-if __name__ == "__main__":
-    import uvicorn
+    # Lazy Load do LLM
+    from src.agent.react_agent import create_datathon_agent
+    from src.agent.tools import get_stock_tools
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    try:
+        tools = get_stock_tools()
+        agent = create_datathon_agent(tools)
+        
+        # 2. Processamento do LLM
+        result = agent.invoke({"input": data.query})
+        resposta_bruta = result.get("output", "Desculpe, não consegui processar a resposta.")
+        
+        # 3. Barreira de Saída (Output Guardrail - OWASP LLM06 / LGPD)
+        resposta_segura = output_guard.sanitize(resposta_bruta)
+        
+        return AgentResponse(answer=resposta_segura)
+    
+    except Exception as e:
+        logger.error(f"Erro no Agente ReAct: {e}")
+        raise HTTPException(status_code=500, detail="Falha na geração da resposta do LLM.")

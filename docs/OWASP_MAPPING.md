@@ -1,23 +1,41 @@
-# 🛡️ Mapeamento de Ameaças (OWASP Top 10) - API Previsão PETR4
+# 🛡️ Mapeamento de Segurança (OWASP) - Defesa em Profundidade
 
-Este documento mapeia as 5 principais ameaças de segurança relevantes para a nossa arquitetura (baseado no OWASP Top 10 API Security 2023) e as mitigações que implementamos.
+**Projeto:** Datathon Fase 05 - Predição de Séries Temporais e Agentes LLM  
+**Módulo:** Governança e Segurança  
 
-## 1. API3:2023 - Broken Object Property Level Authorization (Injeção de Dados)
-* **Ameaça:** Atacantes podem tentar enviar códigos maliciosos, textos ou dados formatados incorretamente no corpo do JSON para tentar quebrar a API ou a rede neural (Data Poisoning/Injection).
-* **Mitigação:** Utilizamos o framework **Pydantic** no FastAPI. A classe `DadosEntrada` exige estritamente um formato `List[float]`. Qualquer envio de texto, valores nulos ou formatos não numéricos é barrado automaticamente na porta de entrada (Erro 422 - Unprocessable Entity), blindando o PyTorch.
+---
 
-## 2. API4:2023 - Unrestricted Resource Consumption (DoS / Negação de Serviço)
-* **Ameaça:** Envio intencional de requisições com payloads gigantescos (ex: uma lista contendo 1 milhão de preços) para estourar a memória RAM do servidor (OOM) e causar instabilidade.
-* **Mitigação:** Implementamos uma validação estrita de Length (Tamanho) na rota de predição. A API aceita **exatamente 30 itens** (`if len(entrada.precos) != 30:`). Arrays maiores ou menores são imediatamente rejeitados (Erro 400), garantindo tempo de inferência constante e protegendo a infraestrutura.
+## 1. Visão Executiva
+Para garantir a resiliência do nosso ecossistema financeiro, implementamos uma arquitetura de **Defesa em Profundidade**. Este documento mapeia as mitigações adotadas contra duas frentes de ataque distintas: as vulnerabilidades de Inteligência Artificial Generativa (**OWASP Top 10 for LLM Applications**) e as vulnerabilidades de Infraestrutura (**OWASP Top 10 API Security**).
 
-## 3. API7:2023 - Security Misconfiguration (Exposição de Dados via Traceback)
-* **Ameaça:** Erros internos (500) não tratados podem retornar mensagens de sistema (Tracebacks) que revelam a estrutura de pastas do servidor, versões de bibliotecas vulneráveis ou a lógica do negócio para o atacante.
-* **Mitigação:** O FastAPI intercepta falhas (como problemas ao carregar o artefato do MLflow) e encapsula os erros em respostas seguras usando `HTTPException`. O Traceback original é ocultado do usuário final, retornando apenas mensagens controladas (ex: "Modelo não carregado no servidor").
+---
 
-## 4. API9:2023 - Improper Inventory Management (APIs Sombra)
-* **Ameaça:** Endpoints legados, esquecidos ou mal documentados tornam-se alvos fáceis, pois a equipe de segurança e monitoramento não sabe da existência deles ("Shadow APIs").
-* **Mitigação:** O FastAPI gera automaticamente a documentação OpenAPI/Swagger "viva" (disponível na rota `/docs`). O inventário da nossa API é intrínseco ao código, garantindo que as rotas e os schemas de dados esperados estejam sempre 100% atualizados e visíveis para auditoria.
+## 2. Camada 1: Segurança do Agente de IA (OWASP for LLMs)
 
-## 5. API8:2023 - Lack of Protection from Automated Threats (Scraping/Bots)
-* **Ameaça:** Bots automatizados bombardeando o endpoint `/predict` para fazer engenharia reversa das predições do nosso modelo LSTM e criar um modelo concorrente não autorizado.
-* **Mitigação:** Como mitigação em nível de infraestrutura, a API foi empacotada de forma "Stateless", pronta para ser deployada atrás de um API Gateway ou WAF (Web Application Firewall) no ambiente de cloud da empresa, onde regras de *Rate Limiting* (Limite de requisições por IP) e bloqueio de tráfego de botnets devem ser aplicadas.
+### 🛡️ OWASP LLM01: Prompt Injection (Injeção de Comandos)
+* **A Ameaça:** Atacantes utilizam comandos maliciosos embutidos no prompt para ignorar as instruções do sistema (*Jailbreak*) e forçar o LLM a executar ações não intencionais.
+* **A Nossa Mitigação:** A classe `InputGuardrail` (`src/security/guardrails.py`) utiliza inspeção baseada em Regex para interceptar padrões clássicos como `"ignore previous instructions"` ou `"act as a"`. Requisições infectadas são rejeitadas (Erro HTTP 400) antes de alcançarem o LLM Qwen.
+
+### 🛡️ OWASP LLM06: Sensitive Information Disclosure (Vazamento de PII)
+* **A Ameaça:** O LLM revela, de forma acidental ou induzida, Informações Pessoalmente Identificáveis (PII) nas suas respostas.
+* **A Nossa Mitigação:** A classe `OutputGuardrail` varre a resposta usando o motor de NLP **Microsoft Presidio**. Expressões regulares bloqueiam a exposição de CPFs (`BR_CPF`) e telefones, substituindo-os por máscaras de segurança (Ex: `<BR_CPF>`) antes do envio da resposta.
+
+### 🛡️ OWASP LLM09: Overreliance (Excesso de Confiança / Alucinação)
+* **A Ameaça:** O sistema depende excessivamente do LLM para a tomada de decisões financeiras exatas, levando a alucinações matemáticas.
+* **A Nossa Mitigação:** O Agente ReAct não calcula preços; ele consulta obrigatoriamente o modelo determinístico (LSTM) para séries temporais e a base vetorial (RAG) para contexto de negócios. A qualidade é auditada pelo framework RAGAS (mantendo *Faithfulness* elevado).
+
+---
+
+## 3. Camada 2: Segurança da Infraestrutura (OWASP API Security)
+
+### 🛡️ API3:2023 - Broken Object Property Level Authorization (Injeção de Dados)
+* **Ameaça:** Atacantes tentam enviar códigos maliciosos ou formatos incorretos no corpo do JSON para quebrar o treinamento ou a inferência da rede neural (Data Poisoning).
+* **Mitigação:** Utilizamos o framework **Pydantic** no FastAPI. Os contratos (`PredictRequest` e `AgentRequest`) exigem tipagem estrita. Qualquer envio de texto ou formato não esperado é barrado automaticamente na porta de entrada (Erro 422 - Unprocessable Entity), blindando os tensores do PyTorch.
+
+### 🛡️ API4:2023 - Unrestricted Resource Consumption (Negação de Serviço / DoS)
+* **Ameaça:** Envio intencional de *payloads* gigantescos ou *prompts* imensos para estourar a memória RAM/VRAM do servidor (OOM) e causar instabilidade (Context Stuffing).
+* **Mitigação:** Implementamos uma validação estrita de Length (Tamanho). No Agente, o *input* é validado contra o limite máximo de *tokens* configurado no YAML. Na inferência temporal, a API checa a janela exata de dias no Feature Store. Requisições maiores são rejeitadas.
+
+### 🛡️ API7:2023 - Security Misconfiguration (Exposição via Traceback)
+* **Ameaça:** Erros internos não tratados retornam mensagens de sistema (Tracebacks) que revelam a estrutura de pastas ou versões de bibliotecas ao atacante.
+* **Mitigação:** O FastAPI intercepta falhas (como timeouts do Redis ou do MLflow) e encapsula os erros em respostas seguras usando `HTTPException`. O *Traceback* é ocultado do usuário final, retornando apenas mensagens controladas (ex: "Erro interno no pipeline de predição").

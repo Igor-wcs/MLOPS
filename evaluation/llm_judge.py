@@ -1,133 +1,135 @@
-"""llm_judge.py
-
-Avaliação LLM-as-judge com ≥ 3 critérios.
-Inclui critério de negócio (adequação financeira).
-Blindado com Regex contra erros de formatação (JSONDecodeError).
-"""
-
-import json
 import logging
-import re
+import yaml
+import mlflow
+import pandas as pd
 from pathlib import Path
+from pydantic import BaseModel, Field
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
 
-from src.serving.llm_serving import generate_response
-
+# Configuração de Logs
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]: %(message)s")
 logger = logging.getLogger(__name__)
 
-JUDGE_PROMPT_TEMPLATE = """Você é um avaliador especializado em análise financeira.
-Avalie a resposta gerada abaixo em 3 critérios, dando nota de 1 a 5 para cada:
+# ==========================================
+# SCHEMAS DO JUIZ (Com validação nativa)
+# ==========================================
+class EvaluationResult(BaseModel):
+    # O Pydantic (ge=1, le=5) já substitui a necessidade da função _clamp_score
+    technical_correctness: int = Field(ge=1, le=5, description="A resposta é factualmente correta?")
+    relevance: int = Field(ge=1, le=5, description="A resposta aborda diretamente a pergunta feita?")
+    clarity: int = Field(ge=1, le=5, description="A resposta é clara, bem organizada e fácil de entender?")
+    investor_utility: int = Field(ge=1, le=5, description="A resposta fornece informações úteis para tomada de decisão de negócio?")
+    risk_disclaimers: int = Field(ge=1, le=5, description="A resposta inclui avisos de que não é recomendação de investimento?")
+    justification: str = Field(description="Justificativa geral e concisa para as notas aplicadas.")
 
-1. **Precisão técnica**: A resposta contém informações financeiras corretas?
-2. **Relevância**: A resposta aborda diretamente a pergunta?
-3. **Adequação ao negócio**: A resposta é útil para decisões de investimento?
+# ==========================================
+#  PROMPT DO JUIZ
+# ==========================================
+JUDGE_SYSTEM_PROMPT = """Você é um avaliador especializado em sistemas de análise financeira.
+Avalie a resposta do assistente comparando-a com a Pergunta e o Gabarito Esperado, considerando o contexto esperado.
 
-Pergunta: {question}
-Resposta Gerada: {answer}
-Gabarito Esperado: {ground_truth}
-
-Responda APENAS em JSON com o formato exato abaixo, sem adicionar comentários antes ou depois:
-{{"precisao_tecnica": <1-5>, "relevancia": <1-5>, "adequacao_negocio": <1-5>, "justificativa": "<texto>"}}
+Atribua notas rigorosas de 1 a 5 para os seguintes critérios:
+1. Correção Técnica
+2. Relevância
+3. Clareza
+4. Utilidade para Investidor
+5. Disclaimers de Risco (Se a pergunta não exige disclaimer, dê nota 5 por padrão).
 """
 
+def load_config() -> dict:
+    with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
 
-def extract_json_from_llm_response(raw_text: str) -> dict:
-    """Extrai e faz o parse seguro do JSON da resposta do LLM usando Regex."""
-    # Busca qualquer bloco de texto que comece com { e termine com }
-    json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
-
-    if json_match:
-        clean_json_string = json_match.group(0)
-        try:
-            return json.loads(clean_json_string)
-        except json.JSONDecodeError:
-            logger.error("Falha no parse do JSON extraído: %s", clean_json_string[:100])
-            return {
-                "precisao_tecnica": 0,
-                "relevancia": 0,
-                "adequacao_negocio": 0,
-                "justificativa": f"Erro de parse no JSON limpo: {clean_json_string[:100]}",
-            }
-    else:
-        logger.error("Nenhum padrão JSON encontrado na resposta: %s", raw_text[:100])
-        return {
-            "precisao_tecnica": 0,
-            "relevancia": 0,
-            "adequacao_negocio": 0,
-            "justificativa": f"LLM não retornou nenhum formato JSON válido: {raw_text[:100]}",
-        }
-
-
-def evaluate_with_judge(
-    golden_set_path: str | Path,
-    answers: list[str],
-) -> list[dict]:
-    """Avalia respostas usando LLM-as-judge.
-
-    Args:
-        golden_set_path: Caminho para golden set JSON.
-        answers: Lista de respostas geradas pelo agente.
-
-    Returns:
-        Lista de avaliações com scores e justificativas.
+def run_llm_judge(results_file_path: str = "ragas_detailed_report.csv"):
     """
-    with open(golden_set_path, encoding="utf-8") as f:
-        golden_set = json.load(f)
+    Avalia as respostas (já geradas pelo RAGAS) usando LLM-as-a-judge 
+    com 5 critérios de negócio e registra no MLflow.
+    """
+    cfg = load_config()
+    file_path = Path(results_file_path)
+    
+    if not file_path.exists():
+        logger.error(f"Arquivo '{results_file_path}' não encontrado. Rode o ragas_eval.py primeiro.")
+        return
 
-    evaluations = []
-    for item, answer in zip(golden_set, answers):
-        prompt = JUDGE_PROMPT_TEMPLATE.format(
-            question=item["query"],
-            answer=answer,
-            ground_truth=item["expected_answer"],
-        )
+    # 1. Lê as respostas que o pipeline já gerou (Evita reprocessamento)
+    df = pd.read_csv(file_path)
+    required_cols = ["question", "answer", "ground_truth"]
+    if not all(col in df.columns for col in required_cols):
+        logger.error(f"O CSV precisa conter as colunas: {required_cols}")
+        return
 
-        # Gera a avaliação usando temperatura zero para máxima consistência
-        raw = generate_response(prompt, temperature=0.0)
+    logger.info("Inicializando o LLM Juiz (GPT-4o-mini)...")
+    try:
+        # LangChain Wrapper com Structured Output
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
+        structured_llm = llm.with_structured_output(EvaluationResult)
+    except Exception as e:
+        logger.error(f"Falha ao iniciar o LLM Juiz: {e}. Verifique a sua OPENAI_API_KEY no .env.")
+        return
 
-        # Usa a nossa nova função blindada
-        result = extract_json_from_llm_response(raw)
-        evaluations.append(result)
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", JUDGE_SYSTEM_PROMPT),
+        ("human", "PERGUNTA: {question}\nGABARITO ESPERADO: {ground_truth}\nRESPOSTA DO ASSISTENTE: {answer}")
+    ])
 
-    # Resumo Matemático
-    avg_scores = {
-        "precisao_tecnica_avg": sum(e.get("precisao_tecnica", 0) for e in evaluations)
-        / max(len(evaluations), 1),
-        "relevancia_avg": sum(e.get("relevancia", 0) for e in evaluations)
-        / max(len(evaluations), 1),
-        "adequacao_negocio_avg": sum(e.get("adequacao_negocio", 0) for e in evaluations)
-        / max(len(evaluations), 1),
-    }
+    judge_chain = prompt | structured_llm
 
-    logger.info("LLM-as-judge scores médios: %s", avg_scores)
-    return evaluations
+    # 2. Execução e Rastreamento (MLflow)
+    mlflow.set_experiment(cfg["paths"]["experiment_name"])
+    
+    with mlflow.start_run(run_name="Avaliacao_LLM_Judge") as run:
+        mlflow.set_tag("phase", "datathon-fase05")
+        mlflow.set_tag("evaluation_type", "llm-as-a-judge")
+        
+        evaluations = []
+        logger.info(f"Julgando {len(df)} respostas com 5 critérios rigorosos...")
 
+        for idx, row in df.iterrows():
+            try:
+                result: EvaluationResult = judge_chain.invoke({
+                    "question": row.get("question", ""),
+                    "ground_truth": row.get("ground_truth", ""),
+                    "answer": row.get("answer", "")
+                })
+                
+                # O Pydantic já garantiu que os valores estão entre 1 e 5
+                evaluations.append({
+                    "question": row.get("question", ""),
+                    "technical_correctness": result.technical_correctness,
+                    "relevance": result.relevance,
+                    "clarity": result.clarity,
+                    "investor_utility": result.investor_utility,
+                    "risk_disclaimers": result.risk_disclaimers,
+                    "overall_score": (result.technical_correctness + result.relevance + result.clarity + result.investor_utility + result.risk_disclaimers) / 5.0,
+                    "justification": result.justification
+                })
+            except Exception as e:
+                logger.warning(f"Falha ao avaliar a linha {idx}: {e}")
 
-def evaluate_prompt_variants(
-    question: str,
-    prompt_variants: list[str],
-) -> list[dict[str, float]]:
-    """A/B test de variantes de prompt com extração segura."""
-    results = []
-    for variant in prompt_variants:
-        # Gera a resposta do agente com a variante atual
-        answer = generate_response(f"{variant}\n\nPergunta: {question}")
+        # 3. Consolidação de Métricas
+        df_evals = pd.DataFrame(evaluations)
+        if df_evals.empty: return
 
-        # O Juiz avalia a resposta gerada
-        judge_prompt = JUDGE_PROMPT_TEMPLATE.format(
-            question=question,
-            answer=answer,
-            ground_truth="N/A",  # Teste cego, sem gabarito
-        )
+        avg_metrics = {
+            "judge_technical_avg": df_evals["technical_correctness"].mean(),
+            "judge_relevance_avg": df_evals["relevance"].mean(),
+            "judge_clarity_avg": df_evals["clarity"].mean(),
+            "judge_utility_avg": df_evals["investor_utility"].mean(),
+            "judge_disclaimer_avg": df_evals["risk_disclaimers"].mean(),
+            "judge_overall_avg": df_evals["overall_score"].mean(),
+        }
+        
+        mlflow.log_metrics(avg_metrics)
+        logger.info(f"Métricas Médias do Juiz: {avg_metrics}")
 
-        raw = generate_response(judge_prompt, temperature=0.0)
-
-        # Extração segura
-        scores = extract_json_from_llm_response(raw)
-        results.append(scores)
-
-    return results
-
+        # Exportação de Artefatos
+        report_path = "llm_judge_detailed_report.csv"
+        df_evals.to_csv(report_path, index=False)
+        mlflow.log_artifact(report_path)
+        
+        logger.info("Julgamento finalizado. CSV de auditoria salvo no MLflow.")
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    logger.info("Script llm_judge.py pronto para uso com blindagem Regex.")
+    run_llm_judge()

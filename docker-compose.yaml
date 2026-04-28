@@ -69,8 +69,6 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
-# ... (mantenha os outros: postgres, airflow, mlflow) ...
-
   prometheus:
     image: prom/prometheus:latest
     volumes:
@@ -96,3 +94,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+
+  api:
+    build: .
+    command: uvicorn src.serving.app:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/opt/airflow/src         # Código fonte
+      - ./configs:/opt/airflow/configs # YAMLs de configuração
+      - ./data:/opt/airflow/data       # Banco ChromaDB (RAG) e Golden Set
+      - ./mlruns:/opt/airflow/mlruns   # Acesso aos artefatos do modelo
+    depends_on:
+      redis:
+        condition: service_healthy
+      mlflow:
+        condition: service_started

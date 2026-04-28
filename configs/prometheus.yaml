@@ -1,10 +1,16 @@
 global:
-  scrape_interval: 15s # Coleta dados a cada 15 segundos
-  evaluation_interval: 15s
+  scrape_interval: 15s      # Frequência de coleta de dados 
+  evaluation_interval: 15s  # Frequência de avaliação das regras de alerta
 
 scrape_configs:
+  # 1. Coleta de Métricas da API (FastAPI + LLM + LSTM)
   - job_name: 'fastapi-app'
-    static_configs:
-      - targets: ['airflow-webserver:8080']
     metrics_path: /metrics
-     
+    static_configs:
+      # Aqui entra o nome do serviço da sua API no docker-compose e a porta dela
+      - targets: ['api:8000'] 
+
+  # 2. Coleta de métricas do próprio Prometheus
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
