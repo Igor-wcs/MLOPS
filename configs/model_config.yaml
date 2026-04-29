@@ -8,6 +8,7 @@ data:
   period: "5y"            # Histórico de coleta na API
   window_size: 30         # Janela de observação (dias passados)
   test_size: 0.2          # Split cronológico (80% Treino / 20% Teste)
+  seed: 42                # Reprodutibilidade (Garantia de MLOps)
 
 # --- 2. Arquitetura do Modelo LSTM ---
 model:
@@ -22,6 +23,7 @@ training:
   learning_rate: 0.001
   num_epochs: 30
   batch_size: 32
+  early_stopping_patience: 5
 
 # --- 4. Métricas de Negócio  ---
 business_metric:
@@ -36,6 +38,7 @@ llm:
   quantization: "int4"
   max_new_tokens: 512
   temperature: 0.1
+  top_p: 0.95
   device_map: "auto"
 
 # --- 6. Governança e Artefatos ---
@@ -43,6 +46,8 @@ paths:
   scaler_path: "scaler.pkl"
   experiment_name: "Datathon_Previsao_Acoes"
   registered_model_name: "LSTM_Petrobras"
+  reports_dir: "reports"
+  logs_dir: "logs"
 
 # --- 7. RAG (Retrieval-Augmented Generation) ---
 rag:
@@ -52,3 +57,4 @@ rag:
   chunk_size: 1000
   chunk_overlap: 200
   top_k: 3
+  search_type: "similarity" # similarity, mmr
