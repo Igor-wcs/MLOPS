@@ -104,17 +104,20 @@ def train_and_log():
 
     try:
         tkt = yf.Ticker(ticker, session=session)
-        dados = tkt.history(period=cfg["data"]["period"])
-        if dados.empty: raise ValueError("Dataset vazio.")
-        dados_close = dados[["Close"]].values
+        df = tkt.history(period=cfg["data"]["period"])
+        if df.empty: raise ValueError("Dataset vazio.")
+        
+        # Feature Engineering Multivariada
+        df["EMA20"] = df["Close"].ewm(span=20, adjust=False).mean()
+        df = df[["Close", "Open", "High", "Low", "Volume", "EMA20"]].dropna()
+        dados_input = df.values
     except Exception as e:
         logger.warning(f"Falha na API: {e}. Ativando Fallback Sintético.")
-        datas = pd.date_range(end=date.today(), periods=1000)
-        dados_close = (np.linspace(25, 42, 1000) + np.random.randn(1000)).reshape(-1, 1)
+        dados_input = np.random.randn(1000, 6) # Mock multivariado
 
     # --- PREPARAÇÃO DE DADOS ---
     window = cfg["data"]["window_size"]
-    X, y, scaler = preparar_janelas_temporais(dados_close, window_size=window)
+    X, y, scaler = preparar_janelas_temporais(dados_input, window_size=window)
 
     split_idx = int(len(X) * (1 - cfg["data"]["test_size"]))
     
@@ -146,8 +149,9 @@ def train_and_log():
         mlflow.log_params(cfg["model"])
         mlflow.log_params(cfg["training"])
         mlflow.log_param("window_size", window)
+        mlflow.log_param("features", "Close, Open, High, Low, Volume, EMA20")
         
-        mlflow.set_tag("model_type", "lstm_time_series")
+        mlflow.set_tag("model_type", "lstm_multivariate")
         mlflow.set_tag("framework", "pytorch")
         mlflow.set_tag("phase", "datathon-fase05")
         mlflow.set_tag("business_metric", f"sigma_tolerance_{cfg['business_metric']['tolerance']}")
@@ -172,9 +176,15 @@ def train_and_log():
             previsoes_scaled = modelo(X_test_t.to(device)).cpu().numpy()
             y_test_scaled = y_test_t.numpy()
 
-            # Desnormalização para Reais (R$)
-            previsoes_real = scaler.inverse_transform(previsoes_scaled)
-            y_test_real = scaler.inverse_transform(y_test_scaled)
+            # Desnormalização Multivariada para Reais (R$)
+            # Criamos um dummy array para reverter o scaler apenas na coluna Close (index 0)
+            def inverse_transform_target(scaled_val, scaler_obj):
+                dummy = np.zeros((len(scaled_val), cfg["model"]["input_size"]))
+                dummy[:, 0] = scaled_val.flatten()
+                return scaler_obj.inverse_transform(dummy)[:, 0].reshape(-1, 1)
+
+            previsoes_real = inverse_transform_target(previsoes_scaled, scaler)
+            y_test_real = inverse_transform_target(y_test_scaled, scaler)
 
             # Métricas Tradicionais
             mse_real = float(mean_squared_error(y_test_real, previsoes_real))

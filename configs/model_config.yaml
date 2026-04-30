@@ -12,7 +12,7 @@ data:
 
 # --- 2. Arquitetura do Modelo LSTM ---
 model:
-  input_size: 1           # 1 para univariado (Close). 
+  input_size: 6           # Multivariado: Close, Open, High, Low, Volume, EMA20 
   hidden_size: 128
   num_layers: 2           
   output_size: 1

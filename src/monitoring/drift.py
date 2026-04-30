@@ -67,40 +67,48 @@ def gerar_relatorio_drift():
 
     try:
         tkt = yf.Ticker(ticker, session=session)
-        # Usando o período de referência do YAML (ex: "1y" ou "2y")
-        dados = tkt.history(period="2y")
-        if dados.empty: raise ValueError("Dataset vazio.")
-        dados_close = dados[["Close"]].values
+        df_yf = tkt.history(period="2y")
+        if df_yf.empty: raise ValueError("Dataset vazio.")
+        
+        # Feature Engineering Multivariada (Mesma do treino/tools)
+        df_yf["EMA20"] = df_yf["Close"].ewm(span=20, adjust=False).mean()
+        df_yf = df_yf[["Close", "Open", "High", "Low", "Volume", "EMA20"]].dropna()
+        dados_input = df_yf.values
     except Exception as e:
         logger.warning(f"Falha na API: {e}. Ativando Fallback Sintético.")
-        datas_mock = pd.date_range(end=date.today(), periods=500)
-        dados_close = (np.linspace(32, 38, 500) + np.random.randn(500)).reshape(-1, 1)
+        dados_input = np.random.randn(500, 6)
 
     # 3. Preparação das janelas temporais
-    X, y, _ = preparar_janelas_temporais(dados_close, window_size)
+    X, y, _ = preparar_janelas_temporais(dados_input, window_size)
 
     # 4. Split de Referência (Passado) vs Atual (Recente)
-    # Aqui ajustamos para pegar os últimos 30 dias de amostras como 'current'
     split = len(X) - 30 
     X_ref_np, X_curr_np = X[:split], X[split:]
 
-    colunas_features = [f"preco_t_minus_{i}" for i in range(window_size, 0, -1)]
-    df_ref = pd.DataFrame(X_ref_np.reshape(-1, window_size), columns=colunas_features)
-    df_curr = pd.DataFrame(X_curr_np.reshape(-1, window_size), columns=colunas_features)
+    # Criando nomes de colunas para as features multivariadas
+    # Como X tem shape (samples, window_size, 6), vamos achatar para o Evidently
+    # mas mantendo a semântica das colunas.
+    features_base = ["Close", "Open", "High", "Low", "Volume", "EMA20"]
+    colunas_features = []
+    for t in range(window_size, 0, -1):
+        for feat in features_base:
+            colunas_features.append(f"{feat}_t-{t}")
 
-    # 5. Geração de Predições para Target Drift (Sua excelente sacada)
+    df_ref = pd.DataFrame(X_ref_np.reshape(len(X_ref_np), -1), columns=colunas_features)
+    df_curr = pd.DataFrame(X_curr_np.reshape(len(X_curr_np), -1), columns=colunas_features)
+
+    # 5. Geração de Predições para Target Drift
     nome_modelo = model_cfg["paths"]["registered_model_name"]
     modelo = obter_modelo_producao(nome_modelo, device)
 
-    # O Evidently procura pela coluna chamada 'prediction'
     if modelo is not None:
         try:
             with torch.no_grad():
                 preds_ref = modelo(torch.tensor(X_ref_np, dtype=torch.float32).to(device)).cpu().numpy()
                 preds_curr = modelo(torch.tensor(X_curr_np, dtype=torch.float32).to(device)).cpu().numpy()
 
-            df_ref["prediction"] = preds_ref
-            df_curr["prediction"] = preds_curr
+            df_ref["prediction"] = preds_ref.flatten()
+            df_curr["prediction"] = preds_curr.flatten()
             logger.info("Predições geradas. Analisando Data Drift e Prediction Drift.")
             metrics_preset = [DataDriftPreset(), TargetDriftPreset()]
         except Exception as e:
