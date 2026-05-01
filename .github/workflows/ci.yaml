@@ -2,20 +2,33 @@ name: Datathon CI
 
 on:
   push:
+    branches: [ main, master, develop ]
     paths:
       - "src/**"
       - "tests/**"
       - "evaluation/**"
+      - "dags/**"
+      - "configs/**"
       - "pyproject.toml"
+      - ".github/workflows/ci.yaml"
   pull_request:
+    branches: [ main, master, develop ]
     paths:
       - "src/**"
       - "tests/**"
       - "evaluation/**"
+      - "dags/**"
+      - "configs/**"
       - "pyproject.toml"
+      - ".github/workflows/ci.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:
+    name: Continuous Integration
     runs-on: ubuntu-latest
     
     steps:
@@ -30,13 +43,21 @@ jobs:
           cache-dependency-path: "pyproject.toml"
 
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
 
       - name: Run Black (format check)
-        run: black src/ tests/ evaluation/ --check
+        run: black src/ tests/ evaluation/ dags/ --check
 
       - name: Run Ruff (lint)
-        run: ruff check src/ tests/ evaluation/
+        run: ruff check src/ tests/ evaluation/ dags/
+
+      - name: Run Mypy (type check)
+        run: mypy src/ dags/ evaluation/
+
+      - name: Run Bandit (security check)
+        run: bandit -r src/ evaluation/ -ll
 
       - name: Create reports directory
         run: mkdir -p reports
@@ -46,6 +67,7 @@ jobs:
           pytest tests/ -x \
             --cov=src \
             --cov-report=xml \
+            --cov-report=term-missing \
             --cov-fail-under=80 \
             --junitxml=reports/test-results.xml
 
@@ -53,7 +75,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: ci-artifacts-${{ github.run_id }}
           path: |
             reports/test-results.xml
             coverage.xml
+            .coverage

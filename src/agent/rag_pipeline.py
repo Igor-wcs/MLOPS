@@ -57,8 +57,8 @@ class RAGPipeline:
 
     def ingest_directory(self) -> None:
         """
-        Lê todos os PDFs e TXTs do diretório configurado e os injeta no ChromaDB.
-        Ideal para popular o banco de dados pela primeira vez.
+        Lê todos os PDFs e TXTs e injeta no ChromaDB de forma incremental.
+        Evita duplicatas básicas verificando se o banco já possui dados antes da ingestão em lote.
         """
         docs_dir = Path(self.docs_dir)
         if not docs_dir.exists():
@@ -66,9 +66,19 @@ class RAGPipeline:
             logger.warning(f"Diretório de documentos criado, mas está vazio: {docs_dir}")
             return
 
-        logger.info(f"Procurando documentos em {docs_dir}...")
+        # Verificação de Ingestão Incremental
+        # Se o banco já tem documentos, evitamos re-processar tudo (estratégia simples)
+        try:
+            count = self.vector_store._collection.count()
+            if count > 0:
+                logger.info(f"O banco vetorial já possui {count} documentos. Pulando ingestão completa para evitar duplicatas.")
+                return
+        except Exception as e:
+            logger.warning(f"Não foi possível verificar contagem do banco: {e}")
+
+        logger.info(f"Iniciando ingestão de novos documentos em {docs_dir}...")
         
-        # Carregadores em lote (Batch Loaders)
+        # Carregadores em lote
         txt_loader = DirectoryLoader(str(docs_dir), glob="**/*.txt", loader_cls=TextLoader)
         pdf_loader = DirectoryLoader(str(docs_dir), glob="**/*.pdf", loader_cls=PyPDFLoader)
 
@@ -78,7 +88,7 @@ class RAGPipeline:
             logger.warning("Nenhum arquivo .txt ou .pdf encontrado para ingestão.")
             return
 
-        # Separação Inteligente de Texto (Chunking)
+        # Chunking Otimizado
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=self.rag_cfg.get("chunk_size", 1000),
             chunk_overlap=self.rag_cfg.get("chunk_overlap", 200),
@@ -86,11 +96,10 @@ class RAGPipeline:
         )
         
         chunks = splitter.split_documents(raw_documents)
-        logger.info(f"Documentos divididos em {len(chunks)} fragmentos (chunks).")
-
+        
         # Inserção no Banco Vetorial
         self.vector_store.add_documents(documents=chunks)
-        logger.info("Ingestão concluída e salva no ChromaDB com sucesso.")
+        logger.info(f"Ingestão concluída: {len(chunks)} fragmentos adicionados ao ChromaDB.")
 
     def retrieve(self, query: str, top_k: int = None) -> List[Document]:
         """

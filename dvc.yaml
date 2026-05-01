@@ -2,9 +2,10 @@ stages:
   feature_engineering:
     cmd: python -m src.features.feature_engineering
     deps:
-      - data/raw
       - src/features/feature_engineering.py
       - configs/model_config.yaml
+    params:
+      - data.window_size
     outs:
       - data/processed
 
@@ -14,3 +15,28 @@ stages:
       - data/processed
       - src/models/train.py
       - configs/model_config.yaml
+    params:
+      - model
+      - training
+      - business_metric
+    outs:
+      - scaler.pkl:
+          cache: false
+          persist: true
+    metrics:
+      - mlruns:
+          cache: false
+
+  evaluate:
+    cmd: python -m evaluation.ragas_eval
+    deps:
+      - data/golden_set/golden_set.json
+      - evaluation/ragas_eval.py
+      - src/agent/react_agent.py
+      - configs/model_config.yaml
+    outs:
+      - ragas_detailed_report.csv:
+          cache: false
+    metrics:
+      - mlruns:
+          cache: false

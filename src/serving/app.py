@@ -147,31 +147,34 @@ def predict(req: PredictRequest):
 
     try:
         window_size = config["data"]["window_size"]
+        input_size = config["model"]["input_size"]
         
-        #  Puxa do Feature Store
-        ultimos_precos = feature_store.obter_janela_predicao(req.ticker, window_size=window_size)
-        if len(ultimos_precos) != window_size:
-            raise ValueError("Janela de dados incompleta no Redis.")
-
-        #  Processamento PyTorch
-        precos_np = np.array(ultimos_precos).reshape(-1, 1)
-        precos_escalonados = scaler.transform(precos_np)
+        # 1. Puxa do Feature Store (Dataframe Multivariado)
+        df_features = feature_store.obter_janela_predicao(req.ticker, window_size=window_size)
+        
+        # 2. Pré-processamento Multivariado
+        dados_escalonados = scaler.transform(df_features.values)
         
         tensor_entrada = torch.tensor(
-            precos_escalonados.reshape(1, window_size, config["model"]["input_size"]), 
+            dados_escalonados.reshape(1, window_size, input_size), 
             dtype=torch.float32
         ).to(device)
 
+        # 3. Inferência
         with torch.no_grad():
             predicao_tensor = model(tensor_entrada)
-            resultado_escalonado = predicao_tensor.cpu().item()
+            resultado_escalonado = predicao_tensor.cpu().numpy()
 
-        resultado_reais = scaler.inverse_transform([[resultado_escalonado]])[0][0]
+        # 4. Desnormalização do Target (Close está na coluna 0)
+        dummy = np.zeros((1, input_size))
+        dummy[0, 0] = resultado_escalonado[0, 0]
+        resultado_reais = scaler.inverse_transform(dummy)[0, 0]
 
         return {
             "ticker": req.ticker,
             "predicted_price_brl": round(float(resultado_reais), 2),
-            "source": "Redis Feature Store"
+            "features_used": list(df_features.columns),
+            "source": "Redis Feature Store (Multivariate)"
         }
 
     except ValueError as ve:

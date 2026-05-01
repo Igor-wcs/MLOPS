@@ -22,33 +22,30 @@ class RedisFeatureStore:
             logger.error(f"Erro ao conectar ao Redis: {e}")
             raise
 
-    def upsert_incremental(self, ticker: str, novos_dados: pd.DataFrame):
+    def upsert_incremental(self, ticker: str, df: pd.DataFrame):
         """
         Implementa o GAP 03: Upsert Incremental sem destruir o store.
-        Usa um Hash do Redis para armazenar as datas como chaves.
+        Armazena o vetor multivariado (OHLCV + EMA20) como string JSON.
         """
         chave_hash = f"features:{ticker}"
+        
+        # Engenharia de Features Multivariada
+        df["EMA20"] = df["Close"].ewm(span=20, adjust=False).mean()
+        df_features = df[["Close", "Open", "High", "Low", "Volume", "EMA20"]].dropna()
 
-        # Transformamos o DataFrame em um dicionário {data: preço}
-        # O Redis HSET aceita múltiplos pares chave-valor de uma vez
-        updates = {str(d.date()): float(v) for d, v in novos_dados["Close"].items()}
+        # Transformamos o DataFrame em um dicionário {data: json_vector}
+        updates = {}
+        for idx, row in df_features.iterrows():
+            updates[str(idx.date())] = row.to_json()
 
         if updates:
-            # HSET realiza o Upsert: se a data existe, atualiza; se não, cria.
-            # Nunca usamos FLUSHALL ou DEL aqui.
             self.client.hset(chave_hash, mapping=updates)
-
-            # Definimos um TTL (Time-To-Live) para o conjunto inteiro.
-            # Se o pipeline parar por mais de 7 dias, os dados expiram por segurança.
             self.client.expire(chave_hash, timedelta(days=7))
+            logger.info(f"✅ {ticker}: Upsert de {len(updates)} vetores multivariados concluído.")
 
-            logger.info(f"✅ {ticker}: Upsert de {len(updates)} registros concluído.")
-
-    def obter_janela_predicao(self, ticker: str, window_size: int = 30):
-        """Busca os últimos N dias para alimentar o modelo LSTM."""
+    def obter_janela_predicao(self, ticker: str, window_size: int = 30) -> pd.DataFrame:
+        """Busca os últimos N dias retornando um DataFrame multivariado."""
         chave_hash = f"features:{ticker}"
-
-        # Buscamos todos os dados do Hash
         todos_dados = self.client.hgetall(chave_hash)
 
         if not todos_dados:
@@ -58,12 +55,14 @@ class RedisFeatureStore:
         datas_ordenadas = sorted(todos_dados.keys())
         ultimas_datas = datas_ordenadas[-window_size:]
 
-        precos = [float(todos_dados[d]) for d in ultimas_datas]
+        # Reconstrói o DataFrame a partir do JSON
+        rows = [pd.read_json(todos_dados[d], typ='series') for d in ultimas_datas]
+        df_result = pd.DataFrame(rows)
 
-        if len(precos) < window_size:
-            raise ValueError(f"Dados insuficientes: {len(precos)}/{window_size}")
+        if len(df_result) < window_size:
+            raise ValueError(f"Dados insuficientes: {len(df_result)}/{window_size}")
 
-        return precos
+        return df_result
 
 
 def executar_atualizacao_diaria():

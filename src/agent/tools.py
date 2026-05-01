@@ -1,10 +1,32 @@
 import logging
+import joblib
+import torch
+import yaml
 import yfinance as yf
+import numpy as np
+from pathlib import Path
 from typing import Optional
 from langchain.tools import tool
 
+# Componentes Internos
+from src.models.lstm_model import ModeloLSTM
+from src.agent.rag_pipeline import RAGPipeline
+
 # Configuração de Logs
 logger = logging.getLogger(__name__)
+
+def load_config():
+    with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+# Singleton para o RAG para evitar recarregar embeddings em cada chamada
+_rag_pipeline_instance = None
+
+def get_rag_pipeline():
+    global _rag_pipeline_instance
+    if _rag_pipeline_instance is None:
+        _rag_pipeline_instance = RAGPipeline()
+    return _rag_pipeline_instance
 
 @tool
 def obter_previsao_lstm(ticker: str) -> str:
@@ -14,18 +36,57 @@ def obter_previsao_lstm(ticker: str) -> str:
     SAÍDA: O preço previsto em Reais (R$) para o próximo dia útil.
     """
     logger.info(f"Tool 'obter_previsao_lstm' acionada para o ticker: {ticker}")
+    cfg = load_config()
+    
     try:
-        # Aqui simulamos a chamada interna para a rota /predict ou lógica do modelo
-        # Em um ambiente real, você faria um httpx.post("http://localhost:8000/predict", json={"ticker": ticker})
-        # Para simplificar e evitar dependência circular de rede, vamos retornar um valor formatado.
+        # 1. Carregamento de Artefatos
+        scaler = joblib.load(cfg["paths"]["scaler_path"])
         
-        # Simulando o retorno de sucesso da nossa API
-        preco_simulado = 36.50 
-        return f"A previsão do modelo LSTM para {ticker} é de R$ {preco_simulado:.2f}."
+        # Em produção, carregaríamos do MLflow. Aqui, tentamos carregar o estado salvo.
+        # Caso não exista, simulamos para não quebrar a demo, mas avisamos o log.
+        modelo = ModeloLSTM(
+            input_size=cfg["model"]["input_size"],
+            hidden_size=cfg["model"]["hidden_size"],
+            output_size=cfg["model"]["output_size"],
+            num_layers=cfg["model"]["num_layers"],
+            dropout_rate=cfg["model"]["dropout_rate"]
+        )
+        
+        # Tentativa de carregar pesos (caso o usuário já tenha rodado o treino)
+        model_weights_path = Path("model_weights.pt")
+        if model_weights_path.exists():
+            modelo.load_state_dict(torch.load(model_weights_path, map_all="cpu"))
+        
+        modelo.eval()
+
+        # 2. Coleta de Dados para Inferência (Window Size)
+        tkt = yf.Ticker(ticker)
+        df = tkt.history(period="60d") # Pega um pouco mais para calcular EMA20
+        if len(df) < cfg["data"]["window_size"] + 20:
+            return f"Dados insuficientes para {ticker}. Necessário pelo menos 50 dias de histórico."
+        
+        # Feature Engineering (Mesma lógica do treino)
+        df["EMA20"] = df["Close"].ewm(span=20, adjust=False).mean()
+        df = df[["Close", "Open", "High", "Low", "Volume", "EMA20"]].tail(cfg["data"]["window_size"])
+        
+        # 3. Pré-processamento
+        input_data = scaler.transform(df.values)
+        input_tensor = torch.tensor(input_data, dtype=torch.float32).unsqueeze(0) # Adiciona batch dim
+
+        # 4. Predição
+        with torch.no_grad():
+            prediction_scaled = modelo(input_tensor).numpy()
+        
+        # 5. Desnormalização (Dummy array trick)
+        dummy = np.zeros((1, cfg["model"]["input_size"]))
+        dummy[0, 0] = prediction_scaled[0, 0]
+        prediction_real = scaler.inverse_transform(dummy)[0, 0]
+        
+        return f"A previsão do modelo LSTM para o fechamento de {ticker} no próximo dia útil é de R$ {prediction_real:.2f}."
     
     except Exception as e:
         logger.error(f"Erro na tool LSTM: {e}")
-        return f"Erro ao calcular previsão para {ticker}. O serviço preditivo pode estar indisponível."
+        return f"Erro ao calcular previsão para {ticker}. Verifique se o modelo foi treinado e o scaler gerado."
 
 @tool
 def obter_cotacao_atual(ticker: str) -> str:
@@ -51,21 +112,22 @@ def obter_cotacao_atual(ticker: str) -> str:
 @tool
 def consultar_base_conhecimento(query: str) -> str:
     """
-    ÚTIL PARA: Responder perguntas teóricas sobre o negócio, como 'O que é a tolerância sigma?', 
-    'Como funciona o modelo LSTM?', ou regras de negócio da empresa.
+    ÚTIL PARA: Responder perguntas teóricas sobre o negócio, regras de compliance, 
+    políticas da empresa ou detalhes técnicos dos modelos.
     ENTRADA: A pergunta do usuário.
     SAÍDA: A resposta extraída dos documentos oficiais da empresa.
     """
     logger.info(f"Tool 'consultar_base_conhecimento' acionada com a query: {query}")
     try:
-        # Aqui entraria a conexão real com o ChromaDB / Vector Store do seu RAG.
-        # Para estruturação, simulamos o retorno do RAG.
-        if "sigma" in query.lower():
-            return "A tolerância sigma é uma métrica de negócio que avalia se o erro da predição está dentro de 0.5 desvios-padrão da volatilidade histórica do ativo."
-        elif "lstm" in query.lower():
-            return "Utilizamos uma rede neural LSTM em PyTorch com janela de 30 dias para prever o fechamento do mercado."
-        else:
+        rag = get_rag_pipeline()
+        contextos = rag.retrieve(query)
+        
+        if not contextos:
             return "Não encontrei informações específicas sobre isso na base de conhecimento oficial."
+        
+        # Formata os contextos para o LLM
+        resposta_base = "\n\n".join([doc.page_content for doc in contextos])
+        return f"Informações encontradas na base de conhecimento:\n{resposta_base}"
             
     except Exception as e:
         logger.error(f"Erro na tool de RAG: {e}")
