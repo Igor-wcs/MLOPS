@@ -1,0 +1,5 @@
+# Política de Investimento - Datathon S.A.
+A empresa Datathon S.A. segue regras rígidas de compliance. 
+Não fazemos recomendações de compra ou venda.
+O modelo LSTM é usado apenas para fins educacionais e de estudo de séries temporais.
+Dividendos são pagos trimestralmente seguindo a política de 25% do lucro líquido.

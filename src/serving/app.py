@@ -28,7 +28,10 @@ logger = logging.getLogger(__name__)
 # ==========================================
 
 tags_metadata = [
-    {"name": "Predição", "description": "Inferência de preços com Feature Store (Redis)."},
+    {
+        "name": "Predição",
+        "description": "Inferência de preços com Feature Store (Redis).",
+    },
     {"name": "Agente", "description": "Consulta ao agente ReAct LLM."},
     {"name": "Treinamento", "description": "Disparo assíncrono do pipeline MLflow."},
     {"name": "Configuração", "description": "Probes de Health e Readiness."},
@@ -62,30 +65,36 @@ feature_store = None
 #    SCHEMAS
 # ==========================================
 
+
 class PredictRequest(BaseModel):
     ticker: str = "PETR4.SA"
+
 
 class AgentRequest(BaseModel):
     query: str
 
+
 class AgentResponse(BaseModel):
     answer: str
+
 
 # ==========================================
 #    STARTUP E PROBES (Estilo Kubernetes)
 # ==========================================
 
+
 @app.on_event("startup")
 def startup_event():
     """Inicializa configurações, hardware, Redis e baixa artefatos do MLflow."""
     global model, scaler, config, device, feature_store
-    
+
     try:
         with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
-            
+
         device = torch.device(
-            "xpu" if hasattr(torch, "xpu") and torch.xpu.is_available() 
+            "xpu"
+            if hasattr(torch, "xpu") and torch.xpu.is_available()
             else "cuda" if torch.cuda.is_available() else "cpu"
         )
         logger.info(f"Servidor inicializado com aceleração em: {device}")
@@ -98,14 +107,14 @@ def startup_event():
         # Carregamento via MLflow Registry
         nome_modelo = config["paths"]["registered_model_name"]
         logger.info(f"Buscando modelo '{nome_modelo}' no MLflow Registry...")
-        
+
         model = mlflow.pytorch.load_model(f"models:/{nome_modelo}/latest").to(device)
         model.eval()
 
         client = MlflowClient()
         versoes = client.search_model_versions(f"name='{nome_modelo}'")
         ultima_versao = max(versoes, key=lambda v: int(v.version))
-        
+
         local_scaler_path = mlflow.artifacts.download_artifacts(
             run_id=ultima_versao.run_id, artifact_path=config["paths"]["scaler_path"]
         )
@@ -115,49 +124,59 @@ def startup_event():
     except Exception as e:
         logger.error(f"Erro no startup: {e}")
 
+
 @app.get("/ready", tags=["Configuração"])
 async def readiness():
     is_ready = model is not None and scaler is not None and feature_store is not None
-    return {
-        "status": "ready" if is_ready else "not_ready",
-        "device": str(device)
-    }
+    return {"status": "ready" if is_ready else "not_ready", "device": str(device)}
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_handler(request: Request, exc: RequestValidationError):
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content=jsonable_encoder({"detail": exc.errors(), "message": "Parâmetros inválidos."}),
+        content=jsonable_encoder(
+            {"detail": exc.errors(), "message": "Parâmetros inválidos."}
+        ),
     )
+
 
 # ==========================================
 #    ENDPOINTS CORE
 # ==========================================
 
+
 @app.post("/train", tags=["Treinamento"])
 async def trigger_training(background_tasks: BackgroundTasks):
     """Dispara o pipeline de treinamento em background (sem travar a API)."""
     background_tasks.add_task(train_and_log)
-    return {"message": "Treinamento assíncrono disparado com sucesso.", "status": "running"}
+    return {
+        "message": "Treinamento assíncrono disparado com sucesso.",
+        "status": "running",
+    }
+
 
 @app.post("/predict", tags=["Predição"])
 def predict(req: PredictRequest):
     if not model or not scaler or not feature_store:
-        raise HTTPException(status_code=503, detail="Serviço indisponível (Model/Redis não carregados).")
+        raise HTTPException(
+            status_code=503, detail="Serviço indisponível (Model/Redis não carregados)."
+        )
 
     try:
         window_size = config["data"]["window_size"]
         input_size = config["model"]["input_size"]
-        
+
         # 1. Puxa do Feature Store (Dataframe Multivariado)
-        df_features = feature_store.obter_janela_predicao(req.ticker, window_size=window_size)
-        
+        df_features = feature_store.obter_janela_predicao(
+            req.ticker, window_size=window_size
+        )
+
         # 2. Pré-processamento Multivariado
         dados_escalonados = scaler.transform(df_features.values)
-        
+
         tensor_entrada = torch.tensor(
-            dados_escalonados.reshape(1, window_size, input_size), 
-            dtype=torch.float32
+            dados_escalonados.reshape(1, window_size, input_size), dtype=torch.float32
         ).to(device)
 
         # 3. Inferência
@@ -174,19 +193,22 @@ def predict(req: PredictRequest):
             "ticker": req.ticker,
             "predicted_price_brl": round(float(resultado_reais), 2),
             "features_used": list(df_features.columns),
-            "source": "Redis Feature Store (Multivariate)"
+            "source": "Redis Feature Store (Multivariate)",
         }
 
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         logger.error(f"Erro na inferência: {e}")
-        raise HTTPException(status_code=500, detail="Erro interno no pipeline de predição.")
+        raise HTTPException(
+            status_code=500, detail="Erro interno no pipeline de predição."
+        )
+
 
 @app.post("/agent", tags=["Agente"], response_model=AgentResponse)
 async def agent_query(data: AgentRequest):
     """Consulta o agente ReAct protegido por Guardrails."""
-    
+
     # 1. Barreira de Entrada (Input Guardrail - OWASP LLM01)
     is_valid, reason = input_guard.validate(data.query)
     if not is_valid:
@@ -199,16 +221,20 @@ async def agent_query(data: AgentRequest):
     try:
         tools = get_stock_tools()
         agent = create_datathon_agent(tools)
-        
+
         # 2. Processamento do LLM
         result = agent.invoke({"input": data.query})
-        resposta_bruta = result.get("output", "Desculpe, não consegui processar a resposta.")
-        
+        resposta_bruta = result.get(
+            "output", "Desculpe, não consegui processar a resposta."
+        )
+
         # 3. Barreira de Saída (Output Guardrail - OWASP LLM06 / LGPD)
         resposta_segura = output_guard.sanitize(resposta_bruta)
-        
+
         return AgentResponse(answer=resposta_segura)
-    
+
     except Exception as e:
         logger.error(f"Erro no Agente ReAct: {e}")
-        raise HTTPException(status_code=500, detail="Falha na geração da resposta do LLM.")
+        raise HTTPException(
+            status_code=500, detail="Falha na geração da resposta do LLM."
+        )

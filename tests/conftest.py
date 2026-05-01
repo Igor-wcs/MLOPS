@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 # Importa a nossa API para habilitar testes de integração
 from src.serving.app import app
 
+
 # ==========================================
 # FIXTURES DE API E SERVING
 # ==========================================
@@ -16,6 +17,7 @@ from src.serving.app import app
 def client() -> TestClient:
     """Cliente de teste do FastAPI para simular requisições HTTP."""
     return TestClient(app)
+
 
 # ==========================================
 # FIXTURES DE DADOS E FEATURES (MOCKS)
@@ -28,14 +30,17 @@ def sample_ohlcv_data() -> pd.DataFrame:
     base_price = 150.0
     prices = base_price + np.cumsum(np.random.randn(n) * 2)
 
-    return pd.DataFrame({
-        "Open": prices + np.random.randn(n) * 0.5,
-        "High": prices + np.abs(np.random.randn(n)) * 2,
-        "Low": prices - np.abs(np.random.randn(n)) * 2,
-        "Close": prices,
-        "Volume": np.random.randint(1_000_000, 50_000_000, size=n).astype(float),
-        "Ticker": "TEST",
-    })
+    return pd.DataFrame(
+        {
+            "Open": prices + np.random.randn(n) * 0.5,
+            "High": prices + np.abs(np.random.randn(n)) * 2,
+            "Low": prices - np.abs(np.random.randn(n)) * 2,
+            "Close": prices,
+            "Volume": np.random.randint(1_000_000, 50_000_000, size=n).astype(float),
+            "Ticker": "TEST",
+        }
+    )
+
 
 @pytest.fixture
 def sample_sequences() -> tuple[np.ndarray, np.ndarray]:
@@ -46,10 +51,12 @@ def sample_sequences() -> tuple[np.ndarray, np.ndarray]:
     y = np.random.randn(n_samples).astype(np.float32)
     return X, y
 
+
 @pytest.fixture
 def lstm_layer_config() -> dict[str, str]:
     """Configuração de camadas padrão para os testes do Factory."""
     return {"lstm1": "LSTM", "linear1": "Linear"}
+
 
 # ==========================================
 # FIXTURES DE AVALIAÇÃO (LLM / RAG)

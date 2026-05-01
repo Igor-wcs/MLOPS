@@ -17,6 +17,7 @@ from src.features.feature_engineering import preparar_janelas_temporais
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+
 def load_configs() -> tuple[dict, dict]:
     """Carrega as configurações centrais."""
     with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
@@ -24,6 +25,7 @@ def load_configs() -> tuple[dict, dict]:
     with open("configs/monitoring_config.yaml", "r", encoding="utf-8") as f:
         mon_cfg = yaml.safe_load(f)
     return model_cfg, mon_cfg
+
 
 def obter_modelo_producao(model_name: str, device: torch.device):
     """Busca a versão mais recente do modelo no MLflow Registry e aloca no device correto."""
@@ -48,17 +50,19 @@ def obter_modelo_producao(model_name: str, device: torch.device):
         logger.warning(f"Não foi possível carregar o modelo do MLflow: {e}")
         return None
 
+
 def gerar_relatorio_drift():
     # 1. Carregamento de Configurações e Hardware
     model_cfg, mon_cfg = load_configs()
     ticker = model_cfg["data"]["ticker"]
     window_size = model_cfg["data"]["window_size"]
-    
+
     device = torch.device(
-        "xpu" if hasattr(torch, "xpu") and torch.xpu.is_available() 
+        "xpu"
+        if hasattr(torch, "xpu") and torch.xpu.is_available()
         else "cuda" if torch.cuda.is_available() else "cpu"
     )
-    
+
     logger.info(f"Iniciando análise de Drift para {ticker} usando {device}...")
 
     # 2. Obtenção Robusta de Dados
@@ -68,8 +72,9 @@ def gerar_relatorio_drift():
     try:
         tkt = yf.Ticker(ticker, session=session)
         df_yf = tkt.history(period="2y")
-        if df_yf.empty: raise ValueError("Dataset vazio.")
-        
+        if df_yf.empty:
+            raise ValueError("Dataset vazio.")
+
         # Feature Engineering Multivariada (Mesma do treino/tools)
         df_yf["EMA20"] = df_yf["Close"].ewm(span=20, adjust=False).mean()
         df_yf = df_yf[["Close", "Open", "High", "Low", "Volume", "EMA20"]].dropna()
@@ -82,7 +87,7 @@ def gerar_relatorio_drift():
     X, y, _ = preparar_janelas_temporais(dados_input, window_size)
 
     # 4. Split de Referência (Passado) vs Atual (Recente)
-    split = len(X) - 30 
+    split = len(X) - 30
     X_ref_np, X_curr_np = X[:split], X[split:]
 
     # Criando nomes de colunas para as features multivariadas
@@ -95,7 +100,9 @@ def gerar_relatorio_drift():
             colunas_features.append(f"{feat}_t-{t}")
 
     df_ref = pd.DataFrame(X_ref_np.reshape(len(X_ref_np), -1), columns=colunas_features)
-    df_curr = pd.DataFrame(X_curr_np.reshape(len(X_curr_np), -1), columns=colunas_features)
+    df_curr = pd.DataFrame(
+        X_curr_np.reshape(len(X_curr_np), -1), columns=colunas_features
+    )
 
     # 5. Geração de Predições para Target Drift
     nome_modelo = model_cfg["paths"]["registered_model_name"]
@@ -104,8 +111,16 @@ def gerar_relatorio_drift():
     if modelo is not None:
         try:
             with torch.no_grad():
-                preds_ref = modelo(torch.tensor(X_ref_np, dtype=torch.float32).to(device)).cpu().numpy()
-                preds_curr = modelo(torch.tensor(X_curr_np, dtype=torch.float32).to(device)).cpu().numpy()
+                preds_ref = (
+                    modelo(torch.tensor(X_ref_np, dtype=torch.float32).to(device))
+                    .cpu()
+                    .numpy()
+                )
+                preds_curr = (
+                    modelo(torch.tensor(X_curr_np, dtype=torch.float32).to(device))
+                    .cpu()
+                    .numpy()
+                )
 
             df_ref["prediction"] = preds_ref.flatten()
             df_curr["prediction"] = preds_curr.flatten()
@@ -120,7 +135,7 @@ def gerar_relatorio_drift():
 
     # 6. Rastreamento MLflow e Execução Evidently
     mlflow.set_experiment(model_cfg["paths"]["experiment_name"])
-    
+
     with mlflow.start_run(run_name="Monitoring_Drift_Evidently"):
         mlflow.set_tag("phase", "datathon-fase05")
         mlflow.set_tag("pipeline_step", "monitoring")
@@ -130,23 +145,28 @@ def gerar_relatorio_drift():
 
         caminho_html = mon_cfg["paths"]["report_html"]
         report.save_html(caminho_html)
-        
+
         # Clipar relatório no MLflow
         mlflow.log_artifact(caminho_html)
 
         # Extração e Log de Métricas
         drift_result = report.as_dict()
         drift_share = drift_result["metrics"][0]["result"]["share_of_drifted_columns"]
-        
+
         mlflow.log_metric("drift_share", float(drift_share))
-        
+
         retrain_th = mon_cfg["drift"]["retrain_threshold"]
         if drift_share > retrain_th:
-            logger.warning(f"🚨 ALERTA CRÍTICO: Degradação detectada ({drift_share * 100:.1f}%). Necessário Retreino.")
+            logger.warning(
+                f"🚨 ALERTA CRÍTICO: Degradação detectada ({drift_share * 100:.1f}%). Necessário Retreino."
+            )
             mlflow.set_tag("status", "CRITICAL_DRIFT")
         else:
-            logger.info(f"✅ Estabilidade confirmada. Drift atual: {drift_share * 100:.1f}%.")
+            logger.info(
+                f"✅ Estabilidade confirmada. Drift atual: {drift_share * 100:.1f}%."
+            )
             mlflow.set_tag("status", "HEALTHY")
+
 
 if __name__ == "__main__":
     gerar_relatorio_drift()

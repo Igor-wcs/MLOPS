@@ -28,7 +28,7 @@ class RedisFeatureStore:
         Armazena o vetor multivariado (OHLCV + EMA20) como string JSON.
         """
         chave_hash = f"features:{ticker}"
-        
+
         # Engenharia de Features Multivariada
         df["EMA20"] = df["Close"].ewm(span=20, adjust=False).mean()
         df_features = df[["Close", "Open", "High", "Low", "Volume", "EMA20"]].dropna()
@@ -41,7 +41,9 @@ class RedisFeatureStore:
         if updates:
             self.client.hset(chave_hash, mapping=updates)
             self.client.expire(chave_hash, timedelta(days=7))
-            logger.info(f"✅ {ticker}: Upsert de {len(updates)} vetores multivariados concluído.")
+            logger.info(
+                f"✅ {ticker}: Upsert de {len(updates)} vetores multivariados concluído."
+            )
 
     def obter_janela_predicao(self, ticker: str, window_size: int = 30) -> pd.DataFrame:
         """Busca os últimos N dias retornando um DataFrame multivariado."""
@@ -56,7 +58,7 @@ class RedisFeatureStore:
         ultimas_datas = datas_ordenadas[-window_size:]
 
         # Reconstrói o DataFrame a partir do JSON
-        rows = [pd.read_json(todos_dados[d], typ='series') for d in ultimas_datas]
+        rows = [pd.read_json(todos_dados[d], typ="series") for d in ultimas_datas]
         df_result = pd.DataFrame(rows)
 
         if len(df_result) < window_size:

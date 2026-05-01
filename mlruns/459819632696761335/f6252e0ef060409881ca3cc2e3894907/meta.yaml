@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/igor_/OneDrive/Desktop/Tecnologia%20da%20Informa%C3%A7%C3%A3o%20-%20TI/datathon-grupo-XX/mlruns/459819632696761335/f6252e0ef060409881ca3cc2e3894907/artifacts
+end_time: 1777669564145
+entry_point_name: ''
+experiment_id: '459819632696761335'
+lifecycle_stage: active
+run_id: f6252e0ef060409881ca3cc2e3894907
+run_name: Monitoring_Drift_Evidently
+run_uuid: f6252e0ef060409881ca3cc2e3894907
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1777669558498
+status: 4
+tags: []
+user_id: airflow

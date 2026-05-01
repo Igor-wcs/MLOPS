@@ -4,6 +4,7 @@ import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
 
+
 class TestHealthProbes:
     """Testes dos probes de saúde para o Kubernetes/Docker."""
 
@@ -13,6 +14,7 @@ class TestHealthProbes:
         data = response.json()
         assert "status" in data
         assert "device" in data
+
 
 class TestPredictEndpoint:
     """Testes do endpoint de inferência (Série Temporal LSTM)."""
@@ -31,6 +33,7 @@ class TestPredictEndpoint:
         assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
         assert "Serviço indisponível" in response.json()["detail"]
 
+
 class TestTrainEndpoint:
     """Testes do endpoint de treinamento (MLOps)."""
 
@@ -39,6 +42,7 @@ class TestTrainEndpoint:
         response = client.post("/train")
         assert response.status_code == status.HTTP_200_OK
         assert response.json()["status"] == "running"
+
 
 class TestAgentEndpoint:
     """Testes do endpoint do agente ReAct (LLM e Guardrails)."""
