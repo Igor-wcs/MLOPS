@@ -11,6 +11,7 @@ from presidio_anonymizer import AnonymizerEngine
 
 logger = logging.getLogger(__name__)
 
+
 @lru_cache(maxsize=1)
 def get_br_analyzer() -> AnalyzerEngine:
     """
@@ -45,21 +46,26 @@ def get_br_analyzer() -> AnalyzerEngine:
     )
     analyzer.registry.add_recognizer(phone_recognizer)
 
-    logger.info("Presidio Analyzer com padrões Brasileiros (LGPD) carregado com sucesso.")
+    logger.info(
+        "Presidio Analyzer com padrões Brasileiros (LGPD) carregado com sucesso."
+    )
     return analyzer
+
 
 class PIIDetector:
     """Classe responsável por escanear e anonimizar textos contra PII."""
 
     def __init__(self, language: str = "pt"):
         self.language = language
-        
+
         try:
             self.analyzer = get_br_analyzer()
             self.anonymizer = AnonymizerEngine()
             self.is_active = True
         except Exception as e:
-            logger.error(f"Erro ao inicializar Presidio. O mascaramento falhará aberto. Erro: {e}")
+            logger.error(
+                f"Erro ao inicializar Presidio. O mascaramento falhará aberto. Erro: {e}"
+            )
             self.is_active = False
 
         self.entities_to_find = [
@@ -73,8 +79,9 @@ class PIIDetector:
 
     def scan(self, text: str) -> list[dict]:
         """Escaneia o texto em busca de PII e retorna os detalhes dos achados para auditoria."""
-        if not self.is_active or not text: return []
-        
+        if not self.is_active or not text:
+            return []
+
         results = self.analyzer.analyze(
             text=text,
             language=self.language,
@@ -93,14 +100,17 @@ class PIIDetector:
         ]
 
         if findings:
-            logger.warning(f"🛡️ Alerta LGPD: Detectadas {len(findings)} ocorrências de PII no output da IA.")
+            logger.warning(
+                f"🛡️ Alerta LGPD: Detectadas {len(findings)} ocorrências de PII no output da IA."
+            )
 
         return findings
 
     def anonymize(self, text: str) -> str:
         """Escaneia o texto e substitui automaticamente o PII por máscaras."""
-        if not self.is_active or not text: return text
-        
+        if not self.is_active or not text:
+            return text
+
         results = self.analyzer.analyze(
             text=text,
             language=self.language,
@@ -120,6 +130,7 @@ class PIIDetector:
     def sanitize_text(self, text: str) -> str:
         """Alias para integração com o OutputGuardrail."""
         return self.anonymize(text)
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)

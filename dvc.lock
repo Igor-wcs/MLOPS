@@ -1,0 +1,85 @@
+schema: '2.0'
+stages:
+  feature_engineering:
+    cmd: python -m src.features.feature_engineering
+    deps:
+    - path: configs/model_config.yaml
+      hash: md5
+      md5: 2a0b6a718cadbbaf743d573a678d8f7b
+      size: 1761
+    - path: src/features/feature_engineering.py
+      hash: md5
+      md5: 1d4d3601f81a55414ec6dfcd276a9a21
+      size: 3355
+    params:
+      configs/model_config.yaml:
+        data.window_size: 30
+    outs:
+    - path: data/processed
+      hash: md5
+      md5: da7b960ae3afd90cbe8c7da0b58da26f.dir
+      size: 1405725
+      nfiles: 3
+  train:
+    cmd: python -m src.models.train
+    deps:
+    - path: configs/model_config.yaml
+      hash: md5
+      md5: 2a0b6a718cadbbaf743d573a678d8f7b
+      size: 1761
+    - path: data/processed
+      hash: md5
+      md5: da7b960ae3afd90cbe8c7da0b58da26f.dir
+      size: 1405725
+      nfiles: 3
+    - path: src/models/train.py
+      hash: md5
+      md5: 8598fdaf972ca40bc9a7e7ab00f39640
+      size: 8689
+    params:
+      configs/model_config.yaml:
+        business_metric:
+          name: sigma_tolerance
+          description: Erro da previsão em desvios-padrão do preço observado
+          tolerance: 0.5
+          window_size: 30
+        model:
+          input_size: 6
+          hidden_size: 128
+          num_layers: 2
+          output_size: 1
+          dropout_rate: 0.2
+        training:
+          learning_rate: 0.001
+          num_epochs: 1
+          batch_size: 32
+          early_stopping_patience: 5
+    outs:
+    - path: scaler.pkl
+      hash: md5
+      md5: 9157e2abb2da3d6faa8aecf80465db74
+      size: 909
+  evaluate:
+    cmd: python -m evaluation.ragas_eval
+    deps:
+    - path: configs/model_config.yaml
+      hash: md5
+      md5: 2a0b6a718cadbbaf743d573a678d8f7b
+      size: 1761
+    - path: data/golden_set/golden_set.json
+      hash: md5
+      md5: 3e6e10cafc93ea01a69b8d688b693240
+      size: 802
+    - path: evaluation/ragas_eval.py
+      hash: md5
+      md5: 212a728424288a4470cdbd94ca27c04d
+      size: 5837
+    - path: src/agent/react_agent.py
+      hash: md5
+      md5: d4943f35d0516ebe92c717af97671aad
+      size: 3333
+    outs:
+    - path: ragas_detailed_report.csv
+      hash: md5
+      md5: acf6d4778da05d873cbc22f4adf1da68
+      size: 105

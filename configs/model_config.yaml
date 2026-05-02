@@ -21,7 +21,7 @@ model:
 # --- 3. Parâmetros de Treinamento ---
 training:
   learning_rate: 0.001
-  num_epochs: 30
+  num_epochs: 5
   batch_size: 32
   early_stopping_patience: 5
 
@@ -35,7 +35,7 @@ business_metric:
 # --- 5. Agente e LLM (Qwen INT4) ---
 llm:
   model_name: "Qwen/Qwen2.5-0.5B-Instruct"
-  quantization: "int4"
+  quantization: "none"
   max_new_tokens: 512
   temperature: 0.1
   top_p: 0.95

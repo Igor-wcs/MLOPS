@@ -12,6 +12,7 @@ from src.security.pii_detection import PIIDetector
 
 logger = logging.getLogger(__name__)
 
+
 def load_security_config() -> dict:
     """Carrega as regras de segurança do YAML para evitar hardcode (Governança)."""
     try:
@@ -20,7 +21,12 @@ def load_security_config() -> dict:
             return cfg.get("security_guardrails", {})
     except Exception as e:
         logger.warning(f"Aviso: Usando defaults de segurança pois o YAML falhou: {e}")
-        return {"max_input_tokens": 4096, "pii_detection_enabled": True, "block_prompt_injection": True}
+        return {
+            "max_input_tokens": 4096,
+            "pii_detection_enabled": True,
+            "block_prompt_injection": True,
+        }
+
 
 class InputGuardrail:
     """Valida e sanitiza input do usuário antes de enviar ao LLM."""
@@ -58,7 +64,10 @@ class InputGuardrail:
             for pattern in self._compiled_patterns:
                 if pattern.search(user_input):
                     logger.warning("Prompt injection detectado: %s", user_input[:100])
-                    return False, "Input bloqueado: padrão de instrução suspeito detectado."
+                    return (
+                        False,
+                        "Input bloqueado: padrão de instrução suspeito detectado.",
+                    )
 
         # Check 2: Tamanho máximo (evitar context stuffing/DoS - OWASP LLM04)
         if len(user_input) > self.max_length:
@@ -76,7 +85,7 @@ class OutputGuardrail:
     def __init__(self, language: str = "pt"):
         self.config = load_security_config()
         self.is_enabled = self.config.get("pii_detection_enabled", True)
-        
+
         # Instancia o detector que já contém o Lazy Loading e as regras do Brasil
         if self.is_enabled:
             self.detector = PIIDetector(language=language)
@@ -102,6 +111,7 @@ class OutputGuardrail:
             )
 
         return anonymized_text
+
 
 # Instâncias prontas para o app.py
 input_guard = InputGuardrail()

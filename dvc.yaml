@@ -5,7 +5,8 @@ stages:
       - src/features/feature_engineering.py
       - configs/model_config.yaml
     params:
-      - data.window_size
+      - configs/model_config.yaml:
+          - data.window_size
     outs:
       - data/processed
 
@@ -16,16 +17,14 @@ stages:
       - src/models/train.py
       - configs/model_config.yaml
     params:
-      - model
-      - training
-      - business_metric
+      - configs/model_config.yaml:
+          - model
+          - training
+          - business_metric
     outs:
       - scaler.pkl:
           cache: false
           persist: true
-    metrics:
-      - mlruns:
-          cache: false
 
   evaluate:
     cmd: python -m evaluation.ragas_eval
@@ -36,7 +35,4 @@ stages:
       - configs/model_config.yaml
     outs:
       - ragas_detailed_report.csv:
-          cache: false
-    metrics:
-      - mlruns:
           cache: false

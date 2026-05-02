@@ -1,8 +1,10 @@
 """Testes de segurança — guardrails (OWASP) e anonimização (LGPD)."""
+
 import pytest
 
 # Importamos as instâncias já configuradas com o nosso YAML
 from src.security.guardrails import input_guard, output_guard
+
 
 class TestInputGuardrail:
     """Testes do guardrail de input (OWASP LLM01 e LLM04)."""
@@ -18,7 +20,7 @@ class TestInputGuardrail:
         # Pega o limite dinâmico configurado no YAML (ex: 4096)
         limite = input_guard.max_length
         texto_gigante = "x" * (limite + 10)
-        
+
         is_valid, reason = input_guard.validate(texto_gigante)
         assert not is_valid
         assert "excede tamanho máximo" in reason
@@ -42,6 +44,7 @@ class TestInputGuardrail:
         assert not is_valid
         assert "padrão de instrução suspeito" in reason
 
+
 class TestOutputGuardrail:
     """Testes do guardrail de output (LGPD e OWASP LLM06)."""
 
@@ -59,7 +62,7 @@ class TestOutputGuardrail:
 
         texto_vazado = "O cliente com CPF 123.456.789-00 sofreu perda na carteira."
         resultado = output_guard.sanitize(texto_vazado)
-        
+
         # O CPF real não pode estar na string resultante
         assert "123.456.789-00" not in resultado
         # A tag de substituição do Presidio deve estar presente

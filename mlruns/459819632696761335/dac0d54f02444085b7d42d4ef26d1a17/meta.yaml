@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/igor_/OneDrive/Desktop/Tecnologia%20da%20Informa%C3%A7%C3%A3o%20-%20TI/datathon-grupo-XX/mlruns/459819632696761335/dac0d54f02444085b7d42d4ef26d1a17/artifacts
+end_time: 1777668365562
+entry_point_name: ''
+experiment_id: '459819632696761335'
+lifecycle_stage: active
+run_id: dac0d54f02444085b7d42d4ef26d1a17
+run_name: Treino_PETR4.SA
+run_uuid: dac0d54f02444085b7d42d4ef26d1a17
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1777668340015
+status: 3
+tags: []
+user_id: igor_
