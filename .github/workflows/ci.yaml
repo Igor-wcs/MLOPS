@@ -46,6 +46,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+          python -m spacy download en_core_web_sm
 
       - name: Run Black (format check)
         run: black src/ tests/ evaluation/ dags/ --check

@@ -75,17 +75,17 @@ def run_baselines():
     cfg = load_config()
     ticker = cfg["data"]["ticker"]
 
-    # Ingestão de Dados
+    # --- CARREGAMENTO DE DADOS (DVC OUTS - Mesmo que o modelo campeão) ---
     try:
-        tkt = yf.Ticker(ticker)
-        dados_close = tkt.history(period=cfg["data"]["period"])[["Close"]].values
-    except Exception:
-        dados_close = np.linspace(25, 42, 1000).reshape(-1, 1) + np.random.randn(
-            1000, 1
-        )
+        X = np.load("data/processed/X.npy")
+        y = np.load("data/processed/y.npy")
+        logger.info("Baselines carregando dados processados do DVC.")
+    except FileNotFoundError:
+        logger.warning("Dados processados não encontrados. Usando Mock para baseline.")
+        X = np.random.randn(500, cfg["data"]["window_size"], cfg["model"]["input_size"])
+        y = np.random.randn(500)
 
-    # Preparação
-    X, y, _ = preparar_janelas_temporais(dados_close, cfg["data"]["window_size"])
+    # Split cronológico consistente
     split_idx = int(len(X) * (1 - cfg["data"]["test_size"]))
 
     X_train, X_test = X[:split_idx], X[split_idx:]

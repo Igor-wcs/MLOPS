@@ -24,29 +24,31 @@ def client() -> TestClient:
 # ==========================================
 @pytest.fixture
 def sample_ohlcv_data() -> pd.DataFrame:
-    """Dados OHLCV sintéticos para testes (nunca dados reais - GAP 08)."""
+    """Dados multivariados sintéticos para testes (6 features: OHLCV + EMA20)."""
     np.random.seed(42)
     n = 100
     base_price = 150.0
     prices = base_price + np.cumsum(np.random.randn(n) * 2)
 
-    return pd.DataFrame(
+    df = pd.DataFrame(
         {
             "Open": prices + np.random.randn(n) * 0.5,
             "High": prices + np.abs(np.random.randn(n)) * 2,
             "Low": prices - np.abs(np.random.randn(n)) * 2,
             "Close": prices,
             "Volume": np.random.randint(1_000_000, 50_000_000, size=n).astype(float),
-            "Ticker": "TEST",
         }
     )
+    # Adiciona a feature EMA20 exigida pelo pipeline
+    df["EMA20"] = df["Close"].ewm(span=20, adjust=False).mean()
+    return df
 
 
 @pytest.fixture
 def sample_sequences() -> tuple[np.ndarray, np.ndarray]:
-    """Sequências sintéticas para testes do modelo PyTorch LSTM."""
+    """Sequências sintéticas para testes do modelo StockLSTM (6 features)."""
     np.random.seed(42)
-    n_samples, seq_len, n_features = 50, 30, 5
+    n_samples, seq_len, n_features = 50, 30, 6
     X = np.random.randn(n_samples, seq_len, n_features).astype(np.float32)
     y = np.random.randn(n_samples).astype(np.float32)
     return X, y

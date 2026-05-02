@@ -51,7 +51,7 @@ def obter_modelo_producao(model_name: str, device: torch.device):
         return None
 
 
-def gerar_relatorio_drift():
+def gerar_relatorio_drift() -> float:
     # 1. Carregamento de Configurações e Hardware
     model_cfg, mon_cfg = load_configs()
     ticker = model_cfg["data"]["ticker"]
@@ -71,17 +71,22 @@ def gerar_relatorio_drift():
 
     try:
         tkt = yf.Ticker(ticker, session=session)
-        df_yf = tkt.history(period="2y")
-        if df_yf.empty:
-            raise ValueError("Dataset vazio.")
+        # Usa os períodos configurados no YAML
+        ref_period = mon_cfg["drift"].get("reference_period", "1y")
+        df_yf = tkt.history(period=ref_period)
+        
+        if len(df_yf) < mon_cfg["drift"].get("min_samples", 50):
+             raise ValueError(f"Dados insuficientes para análise: {len(df_yf)} amostras.")
 
-        # Feature Engineering Multivariada (Mesma do treino/tools)
+        # Feature Engineering Multivariada
         df_yf["EMA20"] = df_yf["Close"].ewm(span=20, adjust=False).mean()
         df_yf = df_yf[["Close", "Open", "High", "Low", "Volume", "EMA20"]].dropna()
         dados_input = df_yf.values
     except Exception as e:
-        logger.warning(f"Falha na API: {e}. Ativando Fallback Sintético.")
-        dados_input = np.random.randn(500, 6)
+        logger.warning(f"Falha na coleta de dados: {e}. Abortando drift ou usando fallback.")
+        # Se for um erro crítico, retornamos 0 para não disparar retreino falso
+        if "insuficientes" in str(e): return 0.0
+        dados_input = np.random.randn(200, 6)
 
     # 3. Preparação das janelas temporais
     X, y, _ = preparar_janelas_temporais(dados_input, window_size)
@@ -91,8 +96,6 @@ def gerar_relatorio_drift():
     X_ref_np, X_curr_np = X[:split], X[split:]
 
     # Criando nomes de colunas para as features multivariadas
-    # Como X tem shape (samples, window_size, 6), vamos achatar para o Evidently
-    # mas mantendo a semântica das colunas.
     features_base = ["Close", "Open", "High", "Low", "Volume", "EMA20"]
     colunas_features = []
     for t in range(window_size, 0, -1):
@@ -161,11 +164,13 @@ def gerar_relatorio_drift():
                 f"🚨 ALERTA CRÍTICO: Degradação detectada ({drift_share * 100:.1f}%). Necessário Retreino."
             )
             mlflow.set_tag("status", "CRITICAL_DRIFT")
+            return float(drift_share)
         else:
             logger.info(
                 f"✅ Estabilidade confirmada. Drift atual: {drift_share * 100:.1f}%."
             )
             mlflow.set_tag("status", "HEALTHY")
+            return float(drift_share)
 
 
 if __name__ == "__main__":

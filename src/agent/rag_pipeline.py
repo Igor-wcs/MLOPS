@@ -124,6 +124,10 @@ class RAGPipeline:
         """
         Busca os contextos mais relevantes no banco para a pergunta atual.
         """
+        if not query or not query.strip():
+            logger.warning("Query vazia recebida no RAGPipeline.")
+            return []
+
         top_k = top_k or self.rag_cfg.get("top_k", 3)
         logger.debug(f"Buscando contexto para: '{query}' (top_k={top_k})")
 

@@ -7,8 +7,8 @@ from src.features.feature_engineering import preparar_janelas_temporais
 
 @pytest.fixture
 def serie_temporal_mock():
-    """Mock de uma série de preços de fechamento (100 dias)."""
-    return np.linspace(10, 110, 100)
+    """Mock de uma série multivariada (100 dias, 6 features)."""
+    return np.random.randn(100, 6)
 
 
 def test_dimensoes_janela_temporal(serie_temporal_mock):
@@ -19,7 +19,8 @@ def test_dimensoes_janela_temporal(serie_temporal_mock):
     )
 
     expected_samples = len(serie_temporal_mock) - window_size
-    assert X.shape == (expected_samples, window_size, 1), "Shape de X incorreto"
+    # Agora o modelo espera 6 features
+    assert X.shape == (expected_samples, window_size, 6), "Shape de X incorreto"
     assert y.shape == (expected_samples,), "Shape de y incorreto"
 
 

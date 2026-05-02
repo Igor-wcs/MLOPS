@@ -81,14 +81,11 @@ class TestToolExecution:
 
     def test_invalid_ticker_handling(self) -> None:
         """Garante que o Agente não quebre a API se o usuário digitar um Ticker que não existe."""
-        # Se você tiver uma função isolada de lookup, substitua _stock_lookup pelo nome real
-        from src.agent.tools import (
-            _stock_lookup,
-        )  # Assumindo que a função base se chama assim
+        from src.agent.tools import obter_cotacao_atual
 
-        result = _stock_lookup("TICKER_FALSO_123")
+        result = obter_cotacao_atual.run("TICKER_FALSO_123")
         assert (
             "erro" in result.lower()
             or "não encontrado" in result.lower()
-            or "sem dados" in result.lower()
+            or "falha" in result.lower()
         )

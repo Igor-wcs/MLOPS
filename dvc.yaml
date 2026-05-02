@@ -15,6 +15,9 @@ stages:
     deps:
       - data/processed
       - src/models/train.py
+      - src/models/lstm_model.py
+      - src/models/lstm_factory.py
+      - src/models/lstm_params.py
       - configs/model_config.yaml
     params:
       - configs/model_config.yaml:
@@ -25,6 +28,9 @@ stages:
       - scaler.pkl:
           cache: false
           persist: true
+      - model_weights.pt:
+          cache: false
+          persist: true
 
   evaluate:
     cmd: python -m evaluation.ragas_eval
@@ -32,6 +38,8 @@ stages:
       - data/golden_set/golden_set.json
       - evaluation/ragas_eval.py
       - src/agent/react_agent.py
+      - src/agent/rag_pipeline.py
+      - src/agent/tools.py
       - configs/model_config.yaml
     outs:
       - ragas_detailed_report.csv:
