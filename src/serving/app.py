@@ -60,6 +60,7 @@ scaler = None
 config = None
 device = None
 feature_store = None
+agent_executor = None # Singleton para o Agente
 
 # ==========================================
 #    SCHEMAS
@@ -86,7 +87,7 @@ class AgentResponse(BaseModel):
 @app.on_event("startup")
 def startup_event():
     """Inicializa configurações, hardware, Redis e baixa artefatos do MLflow."""
-    global model, scaler, config, device, feature_store
+    global model, scaler, config, device, feature_store, agent_executor
 
     try:
         with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
@@ -99,12 +100,18 @@ def startup_event():
         )
         logger.info(f"Servidor inicializado com aceleração em: {device}")
 
+        # 1. Redis Parametrizado
+        redis_cfg = config.get("redis", {})
         try:
-            feature_store = RedisFeatureStore(host="redis", port=6379)
+            feature_store = RedisFeatureStore(
+                host=redis_cfg.get("host", "redis"),
+                port=redis_cfg.get("port", 6379),
+                db=redis_cfg.get("db", 0)
+            )
         except Exception as e:
             logger.warning(f"Aviso: Redis não acessível. Detalhe: {e}")
 
-        # Carregamento via MLflow Registry
+        # 2. Modelo via MLflow Registry
         nome_modelo = config["paths"]["registered_model_name"]
         logger.info(f"Buscando modelo '{nome_modelo}' no MLflow Registry...")
 
@@ -113,13 +120,23 @@ def startup_event():
 
         client = MlflowClient()
         versoes = client.search_model_versions(f"name='{nome_modelo}'")
-        ultima_versao = max(versoes, key=lambda v: int(v.version))
+        if versoes:
+            ultima_versao = max(versoes, key=lambda v: int(v.version))
 
-        local_scaler_path = mlflow.artifacts.download_artifacts(
-            run_id=ultima_versao.run_id, artifact_path=config["paths"]["scaler_path"]
-        )
-        scaler = joblib.load(local_scaler_path)
-        logger.info("Artefatos de inferência carregados com sucesso.")
+            local_scaler_path = mlflow.artifacts.download_artifacts(
+                run_id=ultima_versao.run_id, artifact_path=config["paths"]["scaler_path"]
+            )
+            scaler = joblib.load(local_scaler_path)
+        
+        # 3. Inicialização do Agente Singleton
+        from src.agent.react_agent import create_datathon_agent
+        from src.agent.tools import get_stock_tools
+        
+        logger.info("Inicializando Agente ReAct (Singleton)...")
+        tools = get_stock_tools()
+        agent_executor = create_datathon_agent(tools)
+        
+        logger.info("Artefatos de inferência e Agente carregados com sucesso.")
 
     except Exception as e:
         logger.error(f"Erro no startup: {e}")
@@ -207,25 +224,22 @@ def predict(req: PredictRequest):
 
 @app.post("/agent", tags=["Agente"], response_model=AgentResponse)
 async def agent_query(data: AgentRequest):
-    """Consulta o agente ReAct protegido por Guardrails."""
+    """Consulta o agente ReAct protegido por Guardrails (Baixa Latência)."""
 
     # 1. Barreira de Entrada (Input Guardrail - OWASP LLM01)
     is_valid, reason = input_guard.validate(data.query)
     if not is_valid:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
 
-    # Lazy Load do LLM
-    from src.agent.react_agent import create_datathon_agent
-    from src.agent.tools import get_stock_tools
+    if agent_executor is None:
+        raise HTTPException(status_code=503, detail="Agente LLM não inicializado no startup.")
 
     try:
-        tools = get_stock_tools()
-        agent = create_datathon_agent(tools)
-
-        # 2. Processamento do LLM
-        result = agent.invoke({"input": data.query})
+        # 2. Processamento do LLM (Usa Singleton Singleton carregado no startup)
+        from src.agent.react_agent import query_agent
+        result = query_agent(agent_executor, data.query)
         resposta_bruta = result.get(
-            "output", "Desculpe, não consegui processar a resposta."
+            "answer", "Desculpe, não consegui processar a resposta."
         )
 
         # 3. Barreira de Saída (Output Guardrail - OWASP LLM06 / LGPD)

@@ -58,11 +58,8 @@ docker-logs: ## Mostra os logs dos serviços Docker
 	$(DOCKER_COMPOSE) logs -f
 
 clean: ## Limpa arquivos temporários, cache e artefatos de teste
-	find . -type d -name "__pycache__" -exec rm -rf {} +
-	find . -type d -name ".pytest_cache" -exec rm -rf {} +
-	find . -type d -name ".ruff_cache" -exec rm -rf {} +
-	find . -type d -name ".mypy_cache" -exec rm -rf {} +
-	find . -type f -name ".coverage" -delete
-	find . -type f -name "coverage.xml" -delete
-	find . -type f -name "reports/test-results.xml" -delete
+	-rmdir /s /q .pytest_cache .ruff_cache .mypy_cache 2>nul || rm -rf .pytest_cache .ruff_cache .mypy_cache
+	-find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	-find . -type f -name ".coverage" -delete 2>/dev/null || true
+	-find . -type f -name "coverage.xml" -delete 2>/dev/null || true
 	@echo "Limpeza concluída."

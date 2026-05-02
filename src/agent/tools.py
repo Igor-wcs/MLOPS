@@ -9,7 +9,8 @@ from typing import Optional
 from langchain.tools import tool
 
 # Componentes Internos
-from src.models.lstm_model import ModeloLSTM
+from src.models.lstm_factory import get_model
+from src.models.lstm_params import LSTMParams
 from src.agent.rag_pipeline import RAGPipeline
 
 # Configuração de Logs
@@ -24,13 +25,15 @@ def load_config():
 # Singleton para o RAG para evitar recarregar embeddings em cada chamada
 _rag_pipeline_instance = None
 
+def get_project_root() -> Path:
+    """Retorna o caminho raiz do projeto de forma robusta."""
+    return Path(__file__).parent.parent.parent
 
 def get_rag_pipeline():
     global _rag_pipeline_instance
     if _rag_pipeline_instance is None:
         _rag_pipeline_instance = RAGPipeline()
     return _rag_pipeline_instance
-
 
 @tool
 def obter_previsao_lstm(ticker: str) -> str:
@@ -41,25 +44,32 @@ def obter_previsao_lstm(ticker: str) -> str:
     """
     logger.info(f"Tool 'obter_previsao_lstm' acionada para o ticker: {ticker}")
     cfg = load_config()
+    root = get_project_root()
 
     try:
-        # 1. Carregamento de Artefatos
-        scaler = joblib.load(cfg["paths"]["scaler_path"])
+        # 1. Carregamento de Artefatos (Caminhos relativos à raiz)
+        scaler_path = root / cfg["paths"]["scaler_path"]
+        if not scaler_path.exists():
+             return f"Erro: Scaler não encontrado em {scaler_path}. Rode o treinamento primeiro."
+        
+        scaler = joblib.load(scaler_path)
 
-        # Em produção, carregaríamos do MLflow. Aqui, tentamos carregar o estado salvo.
-        # Caso não exista, simulamos para não quebrar a demo, mas avisamos o log.
-        modelo = ModeloLSTM(
+        # Instanciação via Factory e Params para consistência total
+        params = LSTMParams(
             input_size=cfg["model"]["input_size"],
             hidden_size=cfg["model"]["hidden_size"],
             output_size=cfg["model"]["output_size"],
             num_layers=cfg["model"]["num_layers"],
-            dropout_rate=cfg["model"]["dropout_rate"],
+            dropout=cfg["model"]["dropout_rate"],
         )
+        modelo = get_model(params)
 
         # Tentativa de carregar pesos (caso o usuário já tenha rodado o treino)
-        model_weights_path = Path("model_weights.pt")
+        model_weights_path = root / "model_weights.pt"
         if model_weights_path.exists():
             modelo.load_state_dict(torch.load(model_weights_path, map_location="cpu"))
+        else:
+            logger.warning(f"Pesos do modelo não encontrados em {model_weights_path}. Usando modelo não treinado.")
 
         modelo.eval()
 

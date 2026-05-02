@@ -15,7 +15,8 @@ from torch.utils.data import TensorDataset, DataLoader
 
 # Importando componentes internos
 from src.features.feature_engineering import preparar_janelas_temporais
-from src.models.lstm_model import ModeloLSTM
+from src.models.lstm_factory import get_model
+from src.models.lstm_params import LSTMParams
 
 # Configuração de Logs
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -109,8 +110,12 @@ def train_and_log():
     ticker = cfg["data"]["ticker"]
     window = cfg["data"]["window_size"]
 
-    # Detecção de Hardware
-    device = torch.device("cpu")
+    # Detecção de Hardware Consistente (Nível 2 MLOps)
+    device = torch.device(
+        "xpu"
+        if hasattr(torch, "xpu") and torch.xpu.is_available()
+        else "cuda" if torch.cuda.is_available() else "cpu"
+    )
     logger.info(f"Iniciando treinamento da LSTM utilizando device: {device}")
 
     # --- CARREGAMENTO DE DADOS (DVC OUTS) ---
@@ -141,14 +146,16 @@ def train_and_log():
         shuffle=False,
     )
 
-    # --- INICIALIZAÇÃO DO MODELO ---
-    modelo = ModeloLSTM(
+    # --- INICIALIZAÇÃO DO MODELO VIA FACTORY ---
+    params = LSTMParams(
         input_size=cfg["model"]["input_size"],
         hidden_size=cfg["model"]["hidden_size"],
         output_size=cfg["model"]["output_size"],
         num_layers=cfg["model"]["num_layers"],
-        dropout_rate=cfg["model"]["dropout_rate"],
-    ).to(device)
+        dropout=cfg["model"]["dropout_rate"],
+    )
+
+    modelo = get_model(params).to(device)
 
     criterio = nn.MSELoss()
     otimizador = torch.optim.Adam(

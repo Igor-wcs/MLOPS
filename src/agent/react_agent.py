@@ -50,14 +50,18 @@ class RouterAgent:
     def _init_llm(self):
         llm_cfg = self.cfg["llm"]
         temp = llm_cfg.get("temperature", 0.1)
+        
+        # Correção da lógica de amostragem: se temp for 0, desativa do_sample para ser determinístico
+        do_sample = True if temp > 0 else False
+        
         return HuggingFacePipeline.from_model_id(
             model_id=llm_cfg["model_name"],
             task="text-generation",
-            device_map="auto",
+            device_map=llm_cfg.get("device_map", "auto"),
             pipeline_kwargs={
-                "max_new_tokens": 100,
-                "temperature": temp if temp > 0 else None,
-                "do_sample": True if temp > 0 else False,
+                "max_new_tokens": llm_cfg.get("max_new_tokens", 100),
+                "temperature": temp if do_sample else None,
+                "do_sample": do_sample,
             },
         )
 

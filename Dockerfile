@@ -26,7 +26,8 @@ COPY src/serving/requirements.txt ./serving-requirements.txt
 
 # Instala dependências (Usa o requirements.txt do serving para ser mais leve na API)
 RUN pip install --upgrade pip && \
-    pip install -r serving-requirements.txt
+    pip install -r serving-requirements.txt && \
+    python -m spacy download en_core_web_sm
 
 # Copia o código fonte
 COPY src/ ./src/

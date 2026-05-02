@@ -9,15 +9,26 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
+def load_config():
+    with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
 class RedisFeatureStore:
-    def __init__(self, host="redis", port=6379, db=0):
-        # Conexão com o serviço Redis do Docker
+    def __init__(self, host=None, port=None, db=None):
+        cfg = load_config()
+        redis_cfg = cfg.get("redis", {})
+        
+        # Prioriza argumentos passados, senão usa config
+        host = host or redis_cfg.get("host", "redis")
+        port = port or redis_cfg.get("port", 6379)
+        db = db or redis_cfg.get("db", 0)
+        
         try:
             self.client = redis.Redis(
                 host=host, port=port, db=db, decode_responses=True
             )
             self.client.ping()
-            logger.info("Conectado ao Redis Feature Store.")
+            logger.info(f"Conectado ao Redis Feature Store ({host}:{port}).")
         except Exception as e:
             logger.error(f"Erro ao conectar ao Redis: {e}")
             raise
@@ -27,6 +38,8 @@ class RedisFeatureStore:
         Implementa o GAP 03: Upsert Incremental sem destruir o store.
         Armazena o vetor multivariado (OHLCV + EMA20) como string JSON.
         """
+        cfg = load_config()
+        ttl_days = cfg.get("redis", {}).get("ttl_days", 90)
         chave_hash = f"features:{ticker}"
 
         # Engenharia de Features Multivariada
@@ -40,9 +53,10 @@ class RedisFeatureStore:
 
         if updates:
             self.client.hset(chave_hash, mapping=updates)
-            self.client.expire(chave_hash, timedelta(days=7))
+            # Define o TTL para garantir que os dados não expirem antes da janela necessária
+            self.client.expire(chave_hash, timedelta(days=ttl_days))
             logger.info(
-                f"✅ {ticker}: Upsert de {len(updates)} vetores multivariados concluído."
+                f"✅ {ticker}: Upsert de {len(updates)} vetores multivariados concluído. TTL: {ttl_days} dias."
             )
 
     def obter_janela_predicao(self, ticker: str, window_size: int = 30) -> pd.DataFrame:

@@ -106,8 +106,9 @@ class PIIDetector:
 
         return findings
 
+    @lru_cache(maxsize=128)
     def anonymize(self, text: str) -> str:
-        """Escaneia o texto e substitui automaticamente o PII por máscaras."""
+        """Escaneia o texto e substitui automaticamente o PII por máscaras com cache de resultados."""
         if not self.is_active or not text:
             return text
 

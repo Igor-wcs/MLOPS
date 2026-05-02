@@ -31,16 +31,27 @@ def load_security_config() -> dict:
 class InputGuardrail:
     """Valida e sanitiza input do usuário antes de enviar ao LLM."""
 
-    # Padrões expandidos para mitigar LLM01: Prompt Injection e Jailbreak
+    # Padrões expandidos para mitigar LLM01: Prompt Injection e Jailbreak (Multi-idioma)
     INJECTION_PATTERNS = [
+        # Inglês (Original)
         r"ignore\s+(all\s+)?previous\s+instructions",
         r"you\s+are\s+now\s+a",
-        r"system:\s*",
-        r"<\|im_start\|>",
-        r"\[INST\]",
         r"forget\s+(everything|all|your\s+instructions)",
         r"act\s+as\s+(a\s+)?",
         r"pretend\s+you\s+are",
+        # Português
+        r"ignore\s+(todas\s+as\s+)?instruções\s+anteriores",
+        r"você\s+agora\s+é\s+(um|uma)?",
+        r"esqueça\s+(tudo|todas\s+as\s+suas\s+instruções)",
+        r"atue\s+como\s+(um|uma)?",
+        r"finja\s+que\s+(você\s+)?é",
+        # Espanhol
+        r"ignora\s+(todas\s+las\s+)?instrucciones\s+anteriores",
+        r"actúa\s+como\s+(un|una)?",
+        # Estruturais
+        r"system:\s*",
+        r"<\|im_start\|>",
+        r"\[INST\]",
     ]
 
     def __init__(self):

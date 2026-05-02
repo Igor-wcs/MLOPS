@@ -62,9 +62,9 @@ dev = [
     ]
 
 [project.scripts]
-datathon-train = "src.models.train:main"
-datathon-serve = "src.serving.app:main"
-datathon-eval = "evaluation.ragas_eval:main"
+datathon-train = "src.models.train:train_and_log"
+datathon-serve = "src.serving.app:startup_event"
+datathon-eval = "evaluation.ragas_eval:evaluate_rag_pipeline"
 
 [build-system]
 requires = ["setuptools>=61.0"]
