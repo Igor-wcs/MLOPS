@@ -38,7 +38,11 @@ def compute_sigma_metric(
     Erros acima do threshold (ex: 0.5 sigma) são inaceitáveis para trading.
     """
     errors = np.abs(y_true - y_pred)
-    sigma = float(np.std(y_true[-window:])) if len(y_true) >= window else float(np.std(y_true))
+    sigma = (
+        float(np.std(y_true[-window:]))
+        if len(y_true) >= window
+        else float(np.std(y_true))
+    )
     sigma = max(sigma, 1e-8)  # Evita divisão por zero
 
     sigma_errors = errors / sigma
@@ -107,9 +111,7 @@ def train_and_log() -> str | None:  # noqa: PLR0915
     device = torch.device(
         "xpu"
         if hasattr(torch, "xpu") and torch.xpu.is_available()
-        else "cuda"
-        if torch.cuda.is_available()
-        else "cpu"
+        else "cuda" if torch.cuda.is_available() else "cpu"
     )
     logger.info(f"Iniciando treinamento da LSTM utilizando device: {device}")
 
@@ -153,7 +155,9 @@ def train_and_log() -> str | None:  # noqa: PLR0915
     modelo = get_model(params).to(device)
 
     criterio = nn.MSELoss()
-    otimizador = torch.optim.Adam(modelo.parameters(), lr=cfg["training"]["learning_rate"])
+    otimizador = torch.optim.Adam(
+        modelo.parameters(), lr=cfg["training"]["learning_rate"]
+    )
 
     # --- MLFLOW TRACKING ---
     mlflow.set_experiment(cfg["paths"]["experiment_name"])
@@ -222,7 +226,9 @@ def train_and_log() -> str | None:  # noqa: PLR0915
                 tolerance=cfg["business_metric"]["tolerance"],
             )
 
-        mlflow.log_metrics({"rmse_real": rmse_real, "mae_real": mae_real, **sigma_metrics})
+        mlflow.log_metrics(
+            {"rmse_real": rmse_real, "mae_real": mae_real, **sigma_metrics}
+        )
 
         # --- SALVAMENTO DE ARTEFATOS ---
         mlflow.pytorch.log_model(

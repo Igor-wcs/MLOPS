@@ -112,9 +112,7 @@ def startup_event() -> None:
         state.device = torch.device(
             "xpu"
             if hasattr(torch, "xpu") and torch.xpu.is_available()
-            else "cuda"
-            if torch.cuda.is_available()
-            else "cpu"
+            else "cuda" if torch.cuda.is_available() else "cpu"
         )
         logger.info(f"Servidor inicializado com aceleração em: {state.device}")
 
@@ -133,7 +131,9 @@ def startup_event() -> None:
         nome_modelo = state.config["paths"]["registered_model_name"]
         logger.info(f"Buscando modelo '{nome_modelo}' no MLflow Registry...")
 
-        state.model = mlflow.pytorch.load_model(f"models:/{nome_modelo}/latest").to(state.device)
+        state.model = mlflow.pytorch.load_model(f"models:/{nome_modelo}/latest").to(
+            state.device
+        )
         state.model.eval()
 
         client = MlflowClient()
@@ -162,17 +162,23 @@ def startup_event() -> None:
 async def readiness() -> dict[str, str]:
     """Verifica se os componentes vitais (Modelo/Redis) estão carregados."""
     is_ready = (
-        state.model is not None and state.scaler is not None and state.feature_store is not None
+        state.model is not None
+        and state.scaler is not None
+        and state.feature_store is not None
     )
     return {"status": "ready" if is_ready else "not_ready", "device": str(state.device)}
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     """Captura erros de validação do Pydantic e retorna 400 em vez de 422."""
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content=jsonable_encoder({"detail": exc.errors(), "message": "Parâmetros inválidos."}),
+        content=jsonable_encoder(
+            {"detail": exc.errors(), "message": "Parâmetros inválidos."}
+        ),
     )
 
 
@@ -204,7 +210,9 @@ def predict(req: PredictRequest) -> dict[str, str | float | list[str]]:
         input_size = state.config["model"]["input_size"]
 
         # 1. Puxa do Feature Store (Dataframe Multivariado)
-        df_features = state.feature_store.obter_janela_predicao(req.ticker, window_size=window_size)
+        df_features = state.feature_store.obter_janela_predicao(
+            req.ticker, window_size=window_size
+        )
 
         # 2. Pré-processamento Multivariado
         dados_escalonados = state.scaler.transform(df_features.values)
@@ -234,7 +242,9 @@ def predict(req: PredictRequest) -> dict[str, str | float | list[str]]:
         raise HTTPException(status_code=400, detail=str(ve)) from ve
     except Exception as e:
         logger.error(f"Erro na inferência: {e}")
-        raise HTTPException(status_code=500, detail="Erro interno no pipeline de predição.") from e
+        raise HTTPException(
+            status_code=500, detail="Erro interno no pipeline de predição."
+        ) from e
 
 
 @app.post("/agent", tags=["Agente"], response_model=AgentResponse)
@@ -246,12 +256,16 @@ async def agent_query(data: AgentRequest) -> AgentResponse:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
 
     if state.agent_executor is None:
-        raise HTTPException(status_code=503, detail="Agente LLM não inicializado no startup.")
+        raise HTTPException(
+            status_code=503, detail="Agente LLM não inicializado no startup."
+        )
 
     try:
         # 2. Processamento do LLM (Usa Singleton Singleton carregado no startup)
         result = query_agent(state.agent_executor, data.query)
-        resposta_bruta = result.get("answer", "Desculpe, não consegui processar a resposta.")
+        resposta_bruta = result.get(
+            "answer", "Desculpe, não consegui processar a resposta."
+        )
 
         # 3. Barreira de Saída (Output Guardrail - OWASP LLM06 / LGPD)
         resposta_segura = output_guard.sanitize(resposta_bruta)
@@ -260,4 +274,6 @@ async def agent_query(data: AgentRequest) -> AgentResponse:
 
     except Exception as e:
         logger.error(f"Erro no Agente ReAct: {e}")
-        raise HTTPException(status_code=500, detail="Falha na geração da resposta do LLM.") from e
+        raise HTTPException(
+            status_code=500, detail="Falha na geração da resposta do LLM."
+        ) from e

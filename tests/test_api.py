@@ -42,7 +42,9 @@ class TestTrainEndpoint:
     """Testes do endpoint de treinamento (MLOps)."""
 
     @patch("src.serving.app.train_and_log")
-    def test_train_trigger_background_task(self, mock_train, client: TestClient) -> None:
+    def test_train_trigger_background_task(
+        self, mock_train, client: TestClient
+    ) -> None:
         """Garante que a rota dispara o job assíncrono e não trava a API."""
         response = client.post("/train")
         assert response.status_code == status.HTTP_200_OK

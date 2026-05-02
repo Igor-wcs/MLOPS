@@ -12,10 +12,14 @@ logger = logging.getLogger(__name__)
 # ==========================================
 
 # 1. Latência do Modelo (Tempo de Inferência)
-LATENCY = Summary("model_inference_latency_seconds", "Tempo gasto na predição do modelo LSTM")
+LATENCY = Summary(
+    "model_inference_latency_seconds", "Tempo gasto na predição do modelo LSTM"
+)
 
 # 2. Contador de Requisições por Status
-REQUEST_COUNT = Counter("agent_requests_total", "Total de requisições ao Agente ReAct", ["status"])
+REQUEST_COUNT = Counter(
+    "agent_requests_total", "Total de requisições ao Agente ReAct", ["status"]
+)
 
 # 3. Erro Sigma (Métrica de Negócio em Tempo Real)
 SIGMA_ERROR = Gauge("model_sigma_error", "Erro da predição em desvios-padrão (Sigma)")
@@ -24,8 +28,12 @@ SIGMA_ERROR = Gauge("model_sigma_error", "Erro da predição em desvios-padrão 
 DRIFT_SHARE = Gauge("model_drift_share", "Proporção de colunas com drift detectado")
 
 # 5. Qualidade do LLM (RAGAS / Feedback)
-LLM_FAITHFULNESS = Gauge("agent_llm_faithfulness", "Métrica de fidelidade da resposta ao contexto")
-LLM_RELEVANCY = Gauge("agent_llm_relevancy", "Métrica de relevância da resposta à pergunta")
+LLM_FAITHFULNESS = Gauge(
+    "agent_llm_faithfulness", "Métrica de fidelidade da resposta ao contexto"
+)
+LLM_RELEVANCY = Gauge(
+    "agent_llm_relevancy", "Métrica de relevância da resposta à pergunta"
+)
 
 
 def start_metrics_server(port: int = 9090) -> None:

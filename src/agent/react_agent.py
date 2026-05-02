@@ -72,9 +72,15 @@ class RouterAgent:
         # 1. Roteamento (Lógica Híbrida: LLM + Keywords para robustez em SLM)
         query_lower = input_text.lower()
 
-        if any(w in query_lower for w in ["prev", "futuro", "amanhã", "modelo", "ia", "lstm"]):
+        if any(
+            w in query_lower
+            for w in ["prev", "futuro", "amanhã", "modelo", "ia", "lstm"]
+        ):
             selected = "obter_previsao_lstm"
-        elif any(w in query_lower for w in ["preço", "cotação", "valor", "hoje", "agora", "atual"]):
+        elif any(
+            w in query_lower
+            for w in ["preço", "cotação", "valor", "hoje", "agora", "atual"]
+        ):
             selected = "obter_cotacao_atual"
         elif any(
             w in query_lower

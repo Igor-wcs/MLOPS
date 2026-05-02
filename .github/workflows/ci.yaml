@@ -49,7 +49,9 @@ jobs:
           python -m spacy download en_core_web_sm
 
       - name: Run Black (format check)
-        run: black src/ tests/ evaluation/ dags/ --check
+        run: |
+          black src/ tests/ evaluation/ dags/
+          git diff --exit-code || (echo "Files were reformatted. Please commit changes." && exit 1)
 
       - name: Run Ruff (lint)
         run: ruff check src/ tests/ evaluation/ dags/

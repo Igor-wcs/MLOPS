@@ -80,7 +80,9 @@ def run_baselines() -> None:
         logger.info("Baselines carregando dados processados do DVC.")
     except FileNotFoundError:
         logger.warning("Dados processados não encontrados. Usando Mock para baseline.")
-        x_all = np.random.randn(500, cfg["data"]["window_size"], cfg["model"]["input_size"])
+        x_all = np.random.randn(
+            500, cfg["data"]["window_size"], cfg["model"]["input_size"]
+        )
         y_all = np.random.randn(500)
 
     # Split cronológico consistente
@@ -94,7 +96,9 @@ def run_baselines() -> None:
     # --- RODO 1: O RIDGE ---
     with mlflow.start_run(run_name=f"Baseline_Ridge_{ticker}"):
         logger.info("Executando Ridge...")
-        ridge_model, ridge_metrics = train_ridge_baseline(x_train, y_train, x_test, y_test)
+        ridge_model, ridge_metrics = train_ridge_baseline(
+            x_train, y_train, x_test, y_test
+        )
 
         mlflow.log_params(
             {"model_type": "baseline_ridge", "window_size": cfg["data"]["window_size"]}

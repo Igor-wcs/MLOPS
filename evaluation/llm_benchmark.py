@@ -18,9 +18,7 @@ def run_benchmark() -> None:
     device = (
         "xpu"
         if hasattr(torch, "xpu") and torch.xpu.is_available()
-        else "cuda"
-        if torch.cuda.is_available()
-        else "cpu"
+        else "cuda" if torch.cuda.is_available() else "cpu"
     )
 
     t = time.time()
@@ -57,7 +55,9 @@ def run_benchmark() -> None:
     duration = t_end - t_start
     tps = total_tokens / duration
 
-    logger.info(f"Resposta Gerada: {tok.decode(out[0], skip_special_tokens=True)[len(prompt) :]}")
+    logger.info(
+        f"Resposta Gerada: {tok.decode(out[0], skip_special_tokens=True)[len(prompt) :]}"
+    )
     logger.info("-" * 50)
     logger.info(f"Tokens Gerados: {total_tokens}")
     logger.info(f"Duração: {duration:.2f}s")

@@ -58,7 +58,9 @@ class InputGuardrail:
         """Inicializa o guardrail de entrada com configurações carregadas."""
         self.config = load_security_config()
         self.max_length = self.config.get("max_input_tokens", 4096)
-        self._compiled_patterns = [re.compile(p, re.IGNORECASE) for p in self.INJECTION_PATTERNS]
+        self._compiled_patterns = [
+            re.compile(p, re.IGNORECASE) for p in self.INJECTION_PATTERNS
+        ]
 
     def validate(self, user_input: str) -> tuple[bool, str]:
         """Valida input do usuário contra injeções e context stuffing.
