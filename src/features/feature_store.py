@@ -13,16 +13,17 @@ def load_config():
     with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
+
 class RedisFeatureStore:
     def __init__(self, host=None, port=None, db=None):
         cfg = load_config()
         redis_cfg = cfg.get("redis", {})
-        
+
         # Prioriza argumentos passados, senão usa config
         host = host or redis_cfg.get("host", "redis")
         port = port or redis_cfg.get("port", 6379)
         db = db or redis_cfg.get("db", 0)
-        
+
         try:
             self.client = redis.Redis(
                 host=host, port=port, db=db, decode_responses=True

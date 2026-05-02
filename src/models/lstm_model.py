@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+
 class StockLSTM(nn.Module):
     """
     Arquitetura LSTM para predição de séries temporais financeiras.
@@ -36,9 +37,9 @@ class StockLSTM(nn.Module):
         # Inicializa hidden e cell states com zeros no mesmo device do input
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        
+
         out, _ = self.lstm(x, (h0, c0))
-        
+
         # Extrai apenas o último passo temporal da sequência (Last-Step)
         ultimo_estado = self.fc(out[:, -1, :])
         return ultimo_estado

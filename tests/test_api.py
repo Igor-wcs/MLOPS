@@ -23,7 +23,7 @@ class TestPredictEndpoint:
         """Payload com chaves incorretas deve retornar erro de parâmetros (400 via handler customizado)."""
         # A API espera {"ticker": "PETR4.SA"}, não "acao"
         response = client.post("/predict", json={"acao": "PETR4.SA"})
-        # Como removemos o default, o ticker é obrigatório. 
+        # Como removemos o default, o ticker é obrigatório.
         # O exception handler customizado em app.py converte 422 em 400.
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "Parâmetros inválidos" in response.json()["message"]

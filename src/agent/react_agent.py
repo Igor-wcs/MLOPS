@@ -50,10 +50,10 @@ class RouterAgent:
     def _init_llm(self):
         llm_cfg = self.cfg["llm"]
         temp = llm_cfg.get("temperature", 0.1)
-        
+
         # Correção da lógica de amostragem: se temp for 0, desativa do_sample para ser determinístico
         do_sample = True if temp > 0 else False
-        
+
         return HuggingFacePipeline.from_model_id(
             model_id=llm_cfg["model_name"],
             task="text-generation",
@@ -68,12 +68,21 @@ class RouterAgent:
     def run(self, input_text: str) -> Dict[str, Any]:
         # 1. Roteamento (Lógica Híbrida: LLM + Keywords para robustez em SLM)
         query_lower = input_text.lower()
-        
-        if any(w in query_lower for w in ["prev", "futuro", "amanhã", "modelo", "ia", "lstm"]):
+
+        if any(
+            w in query_lower
+            for w in ["prev", "futuro", "amanhã", "modelo", "ia", "lstm"]
+        ):
             selected = "obter_previsao_lstm"
-        elif any(w in query_lower for w in ["preço", "cotação", "valor", "hoje", "agora", "atual"]):
+        elif any(
+            w in query_lower
+            for w in ["preço", "cotação", "valor", "hoje", "agora", "atual"]
+        ):
             selected = "obter_cotacao_atual"
-        elif any(w in query_lower for w in ["política", "regra", "dividendos", "história", "sobre", "quem"]):
+        elif any(
+            w in query_lower
+            for w in ["política", "regra", "dividendos", "história", "sobre", "quem"]
+        ):
             selected = "consultar_base_conhecimento"
         else:
             # Fallback para o LLM classificar
@@ -94,16 +103,14 @@ class RouterAgent:
         # 3. Resposta Final
         final_query = FINAL_PROMPT.format(input=input_text, observation=obs)
         answer = self.llm.invoke(final_query).strip()
-        
+
         # Limpeza de rastro de prompt (comum em modelos pequenos)
         if "Resposta Final:" in answer:
             answer = answer.split("Resposta Final:")[-1].strip()
 
         return {
             "answer": answer,
-            "intermediate_steps": [
-                {"tool": selected, "input": arg, "output": obs}
-            ],
+            "intermediate_steps": [{"tool": selected, "input": arg, "output": obs}],
         }
 
 

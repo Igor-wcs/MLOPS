@@ -2,6 +2,7 @@ import torch.nn as nn
 from src.models.lstm_model import StockLSTM
 from src.models.lstm_params import LSTMParams
 
+
 def get_model(params: LSTMParams) -> nn.Module:
     """
     Factory para instanciar a arquitetura StockLSTM.

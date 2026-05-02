@@ -74,16 +74,20 @@ def gerar_relatorio_drift() -> float:
         # Usa os períodos configurados no YAML
         ref_period = mon_cfg["drift"].get("reference_period", "1y")
         df_yf = tkt.history(period=ref_period)
-        
+
         if len(df_yf) < mon_cfg["drift"].get("min_samples", 50):
-             raise ValueError(f"Dados insuficientes para análise: {len(df_yf)} amostras.")
+            raise ValueError(
+                f"Dados insuficientes para análise: {len(df_yf)} amostras."
+            )
 
         # Feature Engineering Multivariada
         df_yf["EMA20"] = df_yf["Close"].ewm(span=20, adjust=False).mean()
         df_yf = df_yf[["Close", "Open", "High", "Low", "Volume", "EMA20"]].dropna()
         dados_input = df_yf.values
     except Exception as e:
-        logger.warning(f"Falha na coleta de dados: {e}. Usando fallback de dados sintéticos.")
+        logger.warning(
+            f"Falha na coleta de dados: {e}. Usando fallback de dados sintéticos."
+        )
         # Fallback de dados sintéticos (Mock)
         dados_input = np.random.randn(200, 6)
 

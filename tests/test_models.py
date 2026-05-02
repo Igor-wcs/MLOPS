@@ -32,13 +32,16 @@ class TestLSTMFactory:
         x = torch.randn(4, 30, 6)
         output = model(x)
 
-        assert output.shape == (4, 1), "A saída do modelo deve prever 1 valor por amostra do batch."
+        assert output.shape == (
+            4,
+            1,
+        ), "A saída do modelo deve prever 1 valor por amostra do batch."
 
     def test_device_consistency(self) -> None:
         """Verifica se o modelo inicializa estados no mesmo device que os dados."""
         params = LSTMParams(input_size=6)
         model = get_model(params)
-        
+
         x = torch.randn(2, 10, 6)
         # Se o forward pass completar sem erro de RuntimeError: Expected all tensors to be on the same device
         # significa que h0/c0 foram criados corretamente via x.device
@@ -60,7 +63,7 @@ class TestLSTMParams:
     def test_invalid_input_size(self) -> None:
         """Pydantic deve falhar para valores fora do range ou tipos errados."""
         with pytest.raises(Exception):
-             LSTMParams(hidden_size=5) # ge=16
+            LSTMParams(hidden_size=5)  # ge=16
 
     def test_dropout_range(self) -> None:
         with pytest.raises(Exception):

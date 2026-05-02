@@ -60,7 +60,7 @@ scaler = None
 config = None
 device = None
 feature_store = None
-agent_executor = None # Singleton para o Agente
+agent_executor = None  # Singleton para o Agente
 
 # ==========================================
 #    SCHEMAS
@@ -106,7 +106,7 @@ def startup_event():
             feature_store = RedisFeatureStore(
                 host=redis_cfg.get("host", "redis"),
                 port=redis_cfg.get("port", 6379),
-                db=redis_cfg.get("db", 0)
+                db=redis_cfg.get("db", 0),
             )
         except Exception as e:
             logger.warning(f"Aviso: Redis não acessível. Detalhe: {e}")
@@ -124,18 +124,19 @@ def startup_event():
             ultima_versao = max(versoes, key=lambda v: int(v.version))
 
             local_scaler_path = mlflow.artifacts.download_artifacts(
-                run_id=ultima_versao.run_id, artifact_path=config["paths"]["scaler_path"]
+                run_id=ultima_versao.run_id,
+                artifact_path=config["paths"]["scaler_path"],
             )
             scaler = joblib.load(local_scaler_path)
-        
+
         # 3. Inicialização do Agente Singleton
         from src.agent.react_agent import create_datathon_agent
         from src.agent.tools import get_stock_tools
-        
+
         logger.info("Inicializando Agente ReAct (Singleton)...")
         tools = get_stock_tools()
         agent_executor = create_datathon_agent(tools)
-        
+
         logger.info("Artefatos de inferência e Agente carregados com sucesso.")
 
     except Exception as e:
@@ -232,11 +233,14 @@ async def agent_query(data: AgentRequest):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
 
     if agent_executor is None:
-        raise HTTPException(status_code=503, detail="Agente LLM não inicializado no startup.")
+        raise HTTPException(
+            status_code=503, detail="Agente LLM não inicializado no startup."
+        )
 
     try:
         # 2. Processamento do LLM (Usa Singleton Singleton carregado no startup)
         from src.agent.react_agent import query_agent
+
         result = query_agent(agent_executor, data.query)
         resposta_bruta = result.get(
             "answer", "Desculpe, não consegui processar a resposta."

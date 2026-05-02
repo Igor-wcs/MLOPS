@@ -5,13 +5,23 @@ from unittest.mock import patch, MagicMock
 from src.agent.react_agent import RouterAgent
 from langchain_core.tools import Tool
 
+
 @pytest.fixture
 def mock_tools():
     """Cria ferramentas mockadas para testar o roteamento."""
-    tool1 = Tool(name="obter_previsao_lstm", func=lambda x: "Previsão Mock", description="lstm")
-    tool2 = Tool(name="obter_cotacao_atual", func=lambda x: "Cotação Mock", description="cotação")
-    tool3 = Tool(name="consultar_base_conhecimento", func=lambda x: "RAG Mock", description="base")
+    tool1 = Tool(
+        name="obter_previsao_lstm", func=lambda x: "Previsão Mock", description="lstm"
+    )
+    tool2 = Tool(
+        name="obter_cotacao_atual", func=lambda x: "Cotação Mock", description="cotação"
+    )
+    tool3 = Tool(
+        name="consultar_base_conhecimento",
+        func=lambda x: "RAG Mock",
+        description="base",
+    )
     return [tool1, tool2, tool3]
+
 
 class TestRouterAgent:
     """Validação da lógica de roteamento do Agente Router."""
@@ -49,6 +59,6 @@ class TestRouterAgent:
         agent = RouterAgent(mock_tools)
         # Uma pergunta vaga sem keywords mapeadas
         res = agent.run("Me conte algo aleatório")
-        
+
         assert "answer" in res
         assert len(res["intermediate_steps"]) > 0

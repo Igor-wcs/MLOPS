@@ -47,6 +47,7 @@ def get_rag_pipeline() -> RAGPipeline:
         _rag_pipeline_instance = RAGPipeline()
     return _rag_pipeline_instance
 
+
 @tool
 def obter_previsao_lstm(ticker: str) -> str:
     """
@@ -62,8 +63,8 @@ def obter_previsao_lstm(ticker: str) -> str:
         # 1. Carregamento de Artefatos (Caminhos relativos à raiz)
         scaler_path = root / cfg["paths"]["scaler_path"]
         if not scaler_path.exists():
-             return f"Erro: Scaler não encontrado em {scaler_path}. Rode o treinamento primeiro."
-        
+            return f"Erro: Scaler não encontrado em {scaler_path}. Rode o treinamento primeiro."
+
         scaler = joblib.load(scaler_path)
 
         # Instanciação via Factory e Params para consistência total
@@ -81,7 +82,9 @@ def obter_previsao_lstm(ticker: str) -> str:
         if model_weights_path.exists():
             modelo.load_state_dict(torch.load(model_weights_path, map_location="cpu"))
         else:
-            logger.warning(f"Pesos do modelo não encontrados em {model_weights_path}. Usando modelo não treinado.")
+            logger.warning(
+                f"Pesos do modelo não encontrados em {model_weights_path}. Usando modelo não treinado."
+            )
 
         modelo.eval()
 

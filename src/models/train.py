@@ -170,11 +170,13 @@ def train_and_log():
         mlflow.set_tag("model_name", "LSTM_Petrobras")
         mlflow.set_tag("model_version", "2.0.0")
         mlflow.set_tag("model_type", "regression_time_series")
-        mlflow.set_tag("training_data_version", "DVC_DATA_v2") # Idealmente viria de comando dvc
+        mlflow.set_tag(
+            "training_data_version", "DVC_DATA_v2"
+        )  # Idealmente viria de comando dvc
         mlflow.set_tag("owner", "grupo-XX@datathon.com")
         mlflow.set_tag("risk_level", "medium")
         mlflow.set_tag("fairness_checked", "true")
-        mlflow.set_tag("git_sha", "HEAD") # Idealmente via git rev-parse
+        mlflow.set_tag("git_sha", "HEAD")  # Idealmente via git rev-parse
 
         # 2. Logs de Hiperparâmetros
         mlflow.log_params(cfg["model"])

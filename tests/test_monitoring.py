@@ -6,15 +6,18 @@ import pandas as pd
 from unittest.mock import patch, MagicMock
 from src.monitoring.drift import gerar_relatorio_drift
 
+
 class TestDriftMonitoring:
     """Testes para detecção de Data Drift e Target Drift."""
 
     @patch("src.monitoring.drift.yf.Ticker")
     @patch("src.monitoring.drift.MlflowClient")
     @patch("src.monitoring.drift.mlflow.pytorch.load_model")
-    def test_drift_execution_flow(self, mock_load_model, mock_mlflow_client, mock_ticker) -> None:
+    def test_drift_execution_flow(
+        self, mock_load_model, mock_mlflow_client, mock_ticker
+    ) -> None:
         """Testa o fluxo completo do drift report com mocks de dados e modelo."""
-        
+
         # 1. Mock de dados do Yahoo Finance (Suficientes para não cair no fallback total)
         mock_history = MagicMock()
         data = {
@@ -30,12 +33,18 @@ class TestDriftMonitoring:
         # 2. Mock do modelo no MLflow Registry
         mock_version = MagicMock()
         mock_version.version = "1"
-        mock_mlflow_client.return_value.search_model_versions.return_value = [mock_version]
-        
+        mock_mlflow_client.return_value.search_model_versions.return_value = [
+            mock_version
+        ]
+
         # Simula o modelo retornando predições variadas e válidas
         mock_model_obj = MagicMock()
+
         def side_effect_pred(x):
-            return torch.tensor(np.random.uniform(30, 40, (len(x), 1)), dtype=torch.float32)
+            return torch.tensor(
+                np.random.uniform(30, 40, (len(x), 1)), dtype=torch.float32
+            )
+
         mock_model_obj.side_effect = side_effect_pred
         mock_load_model.return_value = mock_model_obj
 

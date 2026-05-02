@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 # Adiciona o diretório raiz ao path para que os módulos src sejam encontrados
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+
 def check_drift_and_decide() -> bool:
     """
     Executa o monitoramento de drift e decide se o retreino é necessário.
@@ -20,22 +21,28 @@ def check_drift_and_decide() -> bool:
     """
     import yaml
     from src.monitoring.drift import gerar_relatorio_drift
-    
+
     # 1. Executa o monitoramento e obtém o drift_share
     drift_share = gerar_relatorio_drift()
-    
+
     # 2. Carrega as configurações para ler o threshold
-    config_path = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")), "configs/monitoring_config.yaml")
+    config_path = os.path.join(
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
+        "configs/monitoring_config.yaml",
+    )
     with open(config_path, "r", encoding="utf-8") as f:
         mon_cfg = yaml.safe_load(f)
-    
+
     threshold = mon_cfg["drift"]["retrain_threshold"]
-    
+
     logger.info("--- [DRIFT CHECK] ---")
-    logger.info(f"Drift Detectado: {drift_share:.4f} | Limite para Retreino: {threshold:.4f}")
-    
+    logger.info(
+        f"Drift Detectado: {drift_share:.4f} | Limite para Retreino: {threshold:.4f}"
+    )
+
     # 3. Retorna True se o drift for maior que o threshold
     return drift_share > threshold
+
 
 def validate_champion_challenger():
     """
@@ -45,49 +52,59 @@ def validate_champion_challenger():
     import mlflow
     from mlflow.tracking import MlflowClient
     import yaml
-    
-    config_path = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")), "configs/model_config.yaml")
+
+    config_path = os.path.join(
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
+        "configs/model_config.yaml",
+    )
     with open(config_path, "r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
-        
+
     model_name = cfg["paths"]["registered_model_name"]
     client = MlflowClient()
-    
+
     # 1. Busca as versões do modelo no Registry
     try:
         versions = client.search_model_versions(f"name='{model_name}'")
         if len(versions) < 2:
-            logger.info("Apenas uma versão disponível. Promoção automática para Champion.")
+            logger.info(
+                "Apenas uma versão disponível. Promoção automática para Champion."
+            )
             return True
-            
+
         # Ordena por versão para pegar as duas mais recentes
         sorted_versions = sorted(versions, key=lambda v: int(v.version), reverse=True)
-        challenger = sorted_versions[0] # Versão recém treinada
-        champion = sorted_versions[1]   # Versão anterior
-        
+        challenger = sorted_versions[0]  # Versão recém treinada
+        champion = sorted_versions[1]  # Versão anterior
+
         # 2. Busca métricas de performance (RMSE Real)
         run_challenger = client.get_run(challenger.run_id)
         run_champion = client.get_run(champion.run_id)
-        
+
         rmse_challenger = run_challenger.data.metrics.get("rmse_real", 999999)
         rmse_champion = run_champion.data.metrics.get("rmse_real", 999999)
-        
+
         logger.info(f"--- [CHAMPION vs CHALLENGER] ---")
         logger.info(f"Challenger (v{challenger.version}) RMSE: {rmse_challenger:.4f}")
         logger.info(f"Champion (v{champion.version}) RMSE: {rmse_champion:.4f}")
-        
+
         # 3. Critério de Aceite: O erro deve ser menor ou igual ao anterior
         if rmse_challenger <= rmse_champion:
-            logger.info("✅ APROVADO: O novo modelo é superior ou igual. Promoção permitida.")
+            logger.info(
+                "✅ APROVADO: O novo modelo é superior ou igual. Promoção permitida."
+            )
             # Aqui poderíamos adicionar a lógica de transição de stage no MLflow
             return True
         else:
-            logger.info("❌ REPROVADO: O novo modelo degradou a performance. Mantendo Champion atual.")
+            logger.info(
+                "❌ REPROVADO: O novo modelo degradou a performance. Mantendo Champion atual."
+            )
             return False
-            
+
     except Exception as e:
         logger.error(f"Erro na validação: {e}")
         return False
+
 
 # Configurações padrão
 default_args = {
