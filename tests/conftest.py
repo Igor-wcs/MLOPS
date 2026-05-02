@@ -3,7 +3,6 @@
 import numpy as np
 import pandas as pd
 import pytest
-import torch
 from fastapi.testclient import TestClient
 
 # Importa a nossa API para habilitar testes de integração

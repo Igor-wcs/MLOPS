@@ -3,7 +3,6 @@
 import numpy as np
 import pytest
 import torch
-import torch.nn as nn
 
 from src.models.lstm_factory import get_model
 from src.models.lstm_model import StockLSTM

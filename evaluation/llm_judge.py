@@ -1,11 +1,12 @@
 import logging
-import yaml
+from pathlib import Path
+
 import mlflow
 import pandas as pd
-from pathlib import Path
-from pydantic import BaseModel, Field
-from langchain_openai import ChatOpenAI
+import yaml
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from pydantic import BaseModel, Field
 
 # Configuração de Logs
 logging.basicConfig(
@@ -61,13 +62,12 @@ Atribua notas rigorosas de 1 a 5 para os seguintes critérios:
 
 
 def load_config() -> dict:
-    with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
+    with open("configs/model_config.yaml", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def run_llm_judge(results_file_path: str = "ragas_detailed_report.csv"):
-    """
-    Avalia as respostas (já geradas pelo RAGAS) usando LLM-as-a-judge
+    """Avalia as respostas (já geradas pelo RAGAS) usando LLM-as-a-judge
     com 5 critérios de negócio e registra no MLflow.
     """
     cfg = load_config()

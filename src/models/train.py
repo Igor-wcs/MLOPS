@@ -1,20 +1,17 @@
-import torch
 import logging
+from typing import Any
+
 import joblib
 import mlflow
 import mlflow.pytorch
 import numpy as np
-import pandas as pd
-import requests
-import torch.nn as nn
+import torch
 import yaml
-import yfinance as yf
-from datetime import date
-from sklearn.metrics import mean_squared_error, mean_absolute_error
-from torch.utils.data import TensorDataset, DataLoader
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from torch import nn
+from torch.utils.data import DataLoader, TensorDataset
 
 # Importando componentes internos
-from src.features.feature_engineering import preparar_janelas_temporais
 from src.models.lstm_factory import get_model
 from src.models.lstm_params import LSTMParams
 
@@ -29,15 +26,14 @@ logger = logging.getLogger(__name__)
 
 def load_config(config_path: str = "configs/model_config.yaml") -> dict:
     """Carrega as configurações centralizadas."""
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def compute_sigma_metric(
     y_true: np.ndarray, y_pred: np.ndarray, window: int = 30, tolerance: float = 0.5
 ) -> dict:
-    """
-    Calcula a métrica de negócio: erro em desvios-padrão.
+    """Calcula a métrica de negócio: erro em desvios-padrão.
     Erros acima do threshold (ex: 0.5σ) são inaceitáveis para trading.
     """
     errors = np.abs(y_true - y_pred)
@@ -104,7 +100,7 @@ def evaluate_model(model: nn.Module, loader: DataLoader, device: torch.device) -
 # ==========================================
 
 
-def train_and_log():
+def train_and_log() -> str | None:
     """Orquestra o treino, avaliação e tracking no MLflow usando dados do DVC."""
     cfg = load_config()
     ticker = cfg["data"]["ticker"]
@@ -114,7 +110,9 @@ def train_and_log():
     device = torch.device(
         "xpu"
         if hasattr(torch, "xpu") and torch.xpu.is_available()
-        else "cuda" if torch.cuda.is_available() else "cpu"
+        else "cuda"
+        if torch.cuda.is_available()
+        else "cpu"
     )
     logger.info(f"Iniciando treinamento da LSTM utilizando device: {device}")
 
@@ -207,7 +205,9 @@ def train_and_log():
 
             # Desnormalização Multivariada para Reais (R$)
             # Criamos um dummy array para reverter o scaler apenas na coluna Close (index 0)
-            def inverse_transform_target(scaled_val, scaler_obj):
+            def inverse_transform_target(
+                scaled_val: np.ndarray, scaler_obj: Any
+            ) -> np.ndarray:
                 dummy = np.zeros((len(scaled_val), cfg["model"]["input_size"]))
                 dummy[:, 0] = scaled_val.flatten()
                 return scaler_obj.inverse_transform(dummy)[:, 0].reshape(-1, 1)

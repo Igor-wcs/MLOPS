@@ -1,8 +1,9 @@
 """Testes específicos para as ferramentas customizadas do Agente."""
 
-import pytest
+from unittest.mock import MagicMock, patch
+
 import pandas as pd
-from unittest.mock import patch, MagicMock
+
 from src.agent.tools import consultar_base_conhecimento, obter_previsao_lstm
 
 

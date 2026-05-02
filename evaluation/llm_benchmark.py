@@ -1,7 +1,9 @@
-import time, torch
 import logging
-import yaml
+import time
+
 import mlflow
+import torch
+import yaml
 from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 
 logging.basicConfig(level=logging.INFO)
@@ -9,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def load_config():
-    with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
+    with open("configs/model_config.yaml", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
@@ -28,7 +30,9 @@ def executar_benchmark():
     device = torch.device(
         "xpu"
         if hasattr(torch, "xpu") and torch.xpu.is_available()
-        else "cuda" if torch.cuda.is_available() else "cpu"
+        else "cuda"
+        if torch.cuda.is_available()
+        else "cpu"
     )
 
     model = AutoModelForCausalLM.from_pretrained(
@@ -36,7 +40,7 @@ def executar_benchmark():
     ).to(device)
     model.eval()
 
-    logger.info(f"Tempo de Load: {time.time()-t:.1f}s | Device: {device}\n")
+    logger.info(f"Tempo de Load: {time.time() - t:.1f}s | Device: {device}\n")
 
     prompt = "Contexto: O preço do barril de petróleo Brent caiu 3%. \nResuma o impacto para a Petrobras: "
     ids = tok(prompt, return_tensors="pt").input_ids.to(device)

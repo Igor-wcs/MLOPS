@@ -1,6 +1,7 @@
-import time
 import logging
-from prometheus_client import start_http_server, Summary, Counter, Gauge
+import time
+
+from prometheus_client import Counter, Gauge, Summary, start_http_server
 
 # Configuração de Logs
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

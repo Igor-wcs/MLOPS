@@ -1,23 +1,24 @@
 import logging
+
 import joblib
-import yaml
-import mlflow.pytorch
 import mlflow.artifacts
-import torch
+import mlflow.pytorch
 import numpy as np
-from fastapi import FastAPI, HTTPException, Request, status, BackgroundTasks
+import torch
+import yaml
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 from mlflow.tracking import MlflowClient
 from prometheus_fastapi_instrumentator import Instrumentator
+from pydantic import BaseModel
 
 # Importações Internas
 from src.features.feature_store import RedisFeatureStore
-from src.security.guardrails import input_guard, output_guard
 from src.models.train import train_and_log
+from src.security.guardrails import input_guard, output_guard
 
 # Configuração de Logs
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -68,14 +69,20 @@ agent_executor = None  # Singleton para o Agente
 
 
 class PredictRequest(BaseModel):
+    """Corpo da requisição para predição de preços."""
+
     ticker: str
 
 
 class AgentRequest(BaseModel):
+    """Corpo da requisição para consulta ao Agente."""
+
     query: str
 
 
 class AgentResponse(BaseModel):
+    """Resposta formatada do Agente."""
+
     answer: str
 
 
@@ -85,18 +92,20 @@ class AgentResponse(BaseModel):
 
 
 @app.on_event("startup")
-def startup_event():
+def startup_event() -> None:
     """Inicializa configurações, hardware, Redis e baixa artefatos do MLflow."""
     global model, scaler, config, device, feature_store, agent_executor
 
     try:
-        with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
+        with open("configs/model_config.yaml", encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
         device = torch.device(
             "xpu"
             if hasattr(torch, "xpu") and torch.xpu.is_available()
-            else "cuda" if torch.cuda.is_available() else "cpu"
+            else "cuda"
+            if torch.cuda.is_available()
+            else "cpu"
         )
         logger.info(f"Servidor inicializado com aceleração em: {device}")
 
@@ -144,13 +153,17 @@ def startup_event():
 
 
 @app.get("/ready", tags=["Configuração"])
-async def readiness():
+async def readiness() -> dict[str, str]:
+    """Verifica se os componentes vitais (Modelo/Redis) estão carregados."""
     is_ready = model is not None and scaler is not None and feature_store is not None
     return {"status": "ready" if is_ready else "not_ready", "device": str(device)}
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_handler(request: Request, exc: RequestValidationError):
+async def validation_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Captura erros de validação do Pydantic e retorna 400 em vez de 422."""
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
         content=jsonable_encoder(
@@ -165,7 +178,7 @@ async def validation_handler(request: Request, exc: RequestValidationError):
 
 
 @app.post("/train", tags=["Treinamento"])
-async def trigger_training(background_tasks: BackgroundTasks):
+async def trigger_training(background_tasks: BackgroundTasks) -> dict[str, str]:
     """Dispara o pipeline de treinamento em background (sem travar a API)."""
     background_tasks.add_task(train_and_log)
     return {
@@ -175,7 +188,8 @@ async def trigger_training(background_tasks: BackgroundTasks):
 
 
 @app.post("/predict", tags=["Predição"])
-def predict(req: PredictRequest):
+def predict(req: PredictRequest) -> dict[str, str | float | list[str]]:
+    """Executa a predição LSTM multivariada para um ticker."""
     if not model or not scaler or not feature_store:
         raise HTTPException(
             status_code=503, detail="Serviço indisponível (Model/Redis não carregados)."
@@ -215,18 +229,17 @@ def predict(req: PredictRequest):
         }
 
     except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
+        raise HTTPException(status_code=400, detail=str(ve)) from ve
     except Exception as e:
         logger.error(f"Erro na inferência: {e}")
         raise HTTPException(
             status_code=500, detail="Erro interno no pipeline de predição."
-        )
+        ) from e
 
 
 @app.post("/agent", tags=["Agente"], response_model=AgentResponse)
-async def agent_query(data: AgentRequest):
+async def agent_query(data: AgentRequest) -> AgentResponse:
     """Consulta o agente ReAct protegido por Guardrails (Baixa Latência)."""
-
     # 1. Barreira de Entrada (Input Guardrail - OWASP LLM01)
     is_valid, reason = input_guard.validate(data.query)
     if not is_valid:
@@ -255,4 +268,4 @@ async def agent_query(data: AgentRequest):
         logger.error(f"Erro no Agente ReAct: {e}")
         raise HTTPException(
             status_code=500, detail="Falha na geração da resposta do LLM."
-        )
+        ) from e

@@ -1,10 +1,9 @@
-import torch
 import json
 import logging
-import yaml
 from pathlib import Path
-import pandas as pd
 
+import pandas as pd
+import yaml
 from datasets import Dataset
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from ragas import evaluate
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def load_config():
-    with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
+    with open("configs/model_config.yaml", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
@@ -31,7 +30,7 @@ def load_golden_set(path: str = "data/golden_set/golden_set.json") -> list[dict]
             f"Golden set não encontrado em {path}. Crie o arquivo com 20 pares."
         )
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         golden_set = json.load(f)
     logger.info("Golden set carregado: %d pares", len(golden_set))
     return golden_set
@@ -39,7 +38,6 @@ def load_golden_set(path: str = "data/golden_set/golden_set.json") -> list[dict]
 
 def generate_rag_responses(golden_set: list[dict]) -> list[dict]:
     """Gera respostas dinâmicas passando pelo Agente Qwen e RAG local."""
-
     # Importações do nosso ecossistema
     from src.agent.react_agent import create_datathon_agent, query_agent
     from src.agent.tools import get_stock_tools

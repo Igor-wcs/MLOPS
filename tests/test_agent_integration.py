@@ -1,9 +1,11 @@
 """Testes de integração para o Agente ReAct e Roteamento."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from src.agent.react_agent import RouterAgent
 from langchain_core.tools import Tool
+
+from src.agent.react_agent import RouterAgent
 
 
 @pytest.fixture

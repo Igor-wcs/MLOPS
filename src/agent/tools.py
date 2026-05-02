@@ -1,34 +1,35 @@
-import torch
 import logging
+from pathlib import Path
+
 import joblib
+import numpy as np
+import torch
 import yaml
 import yfinance as yf
-import numpy as np
-from pathlib import Path
-from typing import Optional
 from langchain.tools import tool
+
+from src.agent.rag_pipeline import RAGPipeline
 
 # Componentes Internos
 from src.models.lstm_factory import get_model
 from src.models.lstm_params import LSTMParams
-from src.agent.rag_pipeline import RAGPipeline
 
 # Configuração de Logs
 logger = logging.getLogger(__name__)
 
 
 def load_config() -> dict:
-    """
-    Carrega o arquivo de configuração YAML centralizado.
+    """Carrega o arquivo de configuração YAML centralizado.
+
     Returns:
         Dicionário com as configurações do modelo e do pipeline.
     """
-    with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
+    with open("configs/model_config.yaml", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 # Singleton para o RAG para evitar recarregar embeddings em cada chamada
-_rag_pipeline_instance: Optional[RAGPipeline] = None
+_rag_pipeline_instance: RAGPipeline | None = None
 
 
 def get_project_root() -> Path:
@@ -37,8 +38,8 @@ def get_project_root() -> Path:
 
 
 def get_rag_pipeline() -> RAGPipeline:
-    """
-    Retorna a instância singleton do pipeline RAG.
+    """Retorna a instância singleton do pipeline RAG.
+
     Returns:
         Objeto RAGPipeline inicializado.
     """
@@ -50,8 +51,7 @@ def get_rag_pipeline() -> RAGPipeline:
 
 @tool
 def obter_previsao_lstm(ticker: str) -> str:
-    """
-    ÚTIL PARA: Obter a predição futura do preço de uma ação usando o modelo de Inteligência Artificial LSTM interno.
+    """ÚTIL PARA: Obter a predição futura do preço de uma ação usando o modelo de Inteligência Artificial LSTM interno.
     ENTRADA: O código da ação (exemplo: 'PETR4.SA').
     SAÍDA: O preço previsto em Reais (R$) para o próximo dia útil.
     """
@@ -124,8 +124,7 @@ def obter_previsao_lstm(ticker: str) -> str:
 
 @tool
 def obter_cotacao_atual(ticker: str) -> str:
-    """
-    ÚTIL PARA: Obter o preço de fechamento mais recente (tempo real/hoje) de uma ação no mercado.
+    """ÚTIL PARA: Obter o preço de fechamento mais recente (tempo real/hoje) de uma ação no mercado.
     ENTRADA: O código da ação (exemplo: 'PETR4.SA').
     SAÍDA: O preço atual da ação no mercado.
     """
@@ -148,8 +147,7 @@ def obter_cotacao_atual(ticker: str) -> str:
 
 @tool
 def consultar_base_conhecimento(query: str) -> str:
-    """
-    ÚTIL PARA: Responder perguntas teóricas sobre o negócio, regras de compliance,
+    """ÚTIL PARA: Responder perguntas teóricas sobre o negócio, regras de compliance,
     políticas da empresa ou detalhes técnicos dos modelos.
     ENTRADA: A pergunta do usuário.
     SAÍDA: A resposta extraída dos documentos oficiais da empresa.

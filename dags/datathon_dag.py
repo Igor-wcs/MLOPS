@@ -1,10 +1,11 @@
-from airflow import DAG
-from airflow.operators.bash import BashOperator
-from airflow.operators.python import ShortCircuitOperator, PythonOperator
-from datetime import datetime, timedelta
 import logging
 import os
 import sys
+from datetime import datetime, timedelta
+
+from airflow import DAG
+from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator, ShortCircuitOperator
 
 # Configuração de Logs
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -13,15 +14,17 @@ logger = logging.getLogger(__name__)
 # Adiciona o diretório raiz ao path para que os módulos src sejam encontrados
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import yaml
+from mlflow.tracking import MlflowClient
+
+from src.monitoring.drift import gerar_relatorio_drift
+
 
 def check_drift_and_decide() -> bool:
-    """
-    Executa o monitoramento de drift e decide se o retreino é necessário.
+    """Executa o monitoramento de drift e decide se o retreino é necessário.
+
     Retorna True se o drift_share exceder o threshold definido (Event-Driven Retraining).
     """
-    import yaml
-    from src.monitoring.drift import gerar_relatorio_drift
-
     # 1. Executa o monitoramento e obtém o drift_share
     drift_share = gerar_relatorio_drift()
 
@@ -30,7 +33,7 @@ def check_drift_and_decide() -> bool:
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
         "configs/monitoring_config.yaml",
     )
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         mon_cfg = yaml.safe_load(f)
 
     threshold = mon_cfg["drift"]["retrain_threshold"]
@@ -41,23 +44,19 @@ def check_drift_and_decide() -> bool:
     )
 
     # 3. Retorna True se o drift for maior que o threshold
-    return drift_share > threshold
+    return bool(drift_share > threshold)
 
 
-def validate_champion_challenger():
-    """
-    Compara o novo modelo (Challenger) com o modelo atual (Champion) no MLflow.
+def validate_champion_challenger() -> bool:
+    """Compara o novo modelo (Challenger) com o modelo atual (Champion) no MLflow.
+
     Implementa a Governança de Promoção (GAP 07).
     """
-    import mlflow
-    from mlflow.tracking import MlflowClient
-    import yaml
-
     config_path = os.path.join(
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
         "configs/model_config.yaml",
     )
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
 
     model_name = cfg["paths"]["registered_model_name"]
@@ -84,7 +83,7 @@ def validate_champion_challenger():
         rmse_challenger = run_challenger.data.metrics.get("rmse_real", 999999)
         rmse_champion = run_champion.data.metrics.get("rmse_real", 999999)
 
-        logger.info(f"--- [CHAMPION vs CHALLENGER] ---")
+        logger.info("--- [CHAMPION vs CHALLENGER] ---")
         logger.info(f"Challenger (v{challenger.version}) RMSE: {rmse_challenger:.4f}")
         logger.info(f"Champion (v{champion.version}) RMSE: {rmse_champion:.4f}")
 
@@ -95,11 +94,11 @@ def validate_champion_challenger():
             )
             # Aqui poderíamos adicionar a lógica de transição de stage no MLflow
             return True
-        else:
-            logger.info(
-                "❌ REPROVADO: O novo modelo degradou a performance. Mantendo Champion atual."
-            )
-            return False
+
+        logger.info(
+            "❌ REPROVADO: O novo modelo degradou a performance. Mantendo Champion atual."
+        )
+        return False
 
     except Exception as e:
         logger.error(f"Erro na validação: {e}")
@@ -123,7 +122,6 @@ with DAG(
     catchup=False,
     tags=["datathon", "mlops", "nivel-2", "automated-governance"],
 ) as dag:
-
     # Task 1: Ingestão Incremental (Resolve GAP 03)
     task_ingestao = BashOperator(
         task_id="ingestao_incremental_dados",

@@ -1,12 +1,11 @@
-import torch
 import logging
+from typing import Any
+
 import yaml
-from typing import List, Dict, Any
+from langchain_core.tools import Tool
 
 # --- Imports para Roteamento Simples ---
 from langchain_huggingface import HuggingFacePipeline
-from langchain_core.prompts import PromptTemplate
-from langchain_core.tools import Tool
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +33,14 @@ Resposta Final:"""
 
 
 def load_config():
-    with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
+    with open("configs/model_config.yaml", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 class RouterAgent:
     """Versão enxuta para hardware limitado."""
 
-    def __init__(self, tools: List[Tool]):
+    def __init__(self, tools: list[Tool]):
         self.cfg = load_config()
         self.ticker = self.cfg["data"]["ticker"]
         self.tools = {t.name: t for t in tools}
@@ -65,7 +64,7 @@ class RouterAgent:
             },
         )
 
-    def run(self, input_text: str) -> Dict[str, Any]:
+    def run(self, input_text: str) -> dict[str, Any]:
         # 1. Roteamento (Lógica Híbrida: LLM + Keywords para robustez em SLM)
         query_lower = input_text.lower()
 
@@ -115,7 +114,7 @@ class RouterAgent:
 
 
 # Mantendo compatibilidade com scripts existentes
-def create_datathon_agent(tools: List[Tool]):
+def create_datathon_agent(tools: list[Tool]):
     return RouterAgent(tools)
 
 

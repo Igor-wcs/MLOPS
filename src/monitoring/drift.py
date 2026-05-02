@@ -1,14 +1,14 @@
 import logging
-import yaml
-import pandas as pd
-import numpy as np
-import yfinance as yf
-import torch
+
 import mlflow.pytorch
+import numpy as np
+import pandas as pd
 import requests
-from datetime import date
-from evidently.report import Report
+import torch
+import yaml
+import yfinance as yf
 from evidently.metric_preset import DataDriftPreset, TargetDriftPreset
+from evidently.report import Report
 from mlflow.tracking import MlflowClient
 
 # Importando a nossa preparação de dados
@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 
 def load_configs() -> tuple[dict, dict]:
     """Carrega as configurações centrais."""
-    with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
+    with open("configs/model_config.yaml", encoding="utf-8") as f:
         model_cfg = yaml.safe_load(f)
-    with open("configs/monitoring_config.yaml", "r", encoding="utf-8") as f:
+    with open("configs/monitoring_config.yaml", encoding="utf-8") as f:
         mon_cfg = yaml.safe_load(f)
     return model_cfg, mon_cfg
 
@@ -60,7 +60,9 @@ def gerar_relatorio_drift() -> float:
     device = torch.device(
         "xpu"
         if hasattr(torch, "xpu") and torch.xpu.is_available()
-        else "cuda" if torch.cuda.is_available() else "cpu"
+        else "cuda"
+        if torch.cuda.is_available()
+        else "cpu"
     )
 
     logger.info(f"Iniciando análise de Drift para {ticker} usando {device}...")

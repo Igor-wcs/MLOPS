@@ -1,13 +1,13 @@
 import logging
-import os
-import yaml
-import yfinance as yf
-import requests
+from pathlib import Path
+from typing import Any
+
 import joblib
 import numpy as np
+import requests
+import yaml
+import yfinance as yf
 from sklearn.preprocessing import MinMaxScaler
-from typing import Tuple, Any
-from pathlib import Path
 
 # Configuração de Logs
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -16,15 +16,14 @@ logger = logging.getLogger(__name__)
 
 def load_config(config_path: str = "configs/model_config.yaml") -> dict:
     """Carrega as configurações centralizadas."""
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def preparar_janelas_temporais(
     dados: np.ndarray, window_size: int = 30, train_ratio: float = 0.8
-) -> Tuple[np.ndarray, np.ndarray, Any]:
-    """
-    Escalona e prepara janelas temporais para treinamento do modelo LSTM multivariado.
+) -> tuple[np.ndarray, np.ndarray, Any]:
+    """Escalona e prepara janelas temporais para treinamento do modelo LSTM multivariado.
     O target é assumido como a primeira coluna do array 'dados'.
 
     Args:

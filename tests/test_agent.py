@@ -1,7 +1,7 @@
 """Testes do agente ReAct, suas ferramentas e integrações."""
 
-import pytest
 from unittest.mock import patch
+
 from src.agent.tools import get_stock_tools
 
 
@@ -11,9 +11,9 @@ class TestAgentTools:
     def test_get_stock_tools_count(self) -> None:
         """Garante a exigência da Etapa 2 do Datathon (≥ 3 tools)."""
         tools = get_stock_tools()
-        assert (
-            len(tools) >= 3
-        ), "O Agente deve possuir pelo menos 3 ferramentas configuradas."
+        assert len(tools) >= 3, (
+            "O Agente deve possuir pelo menos 3 ferramentas configuradas."
+        )
 
     def test_tool_names_unique(self) -> None:
         """Garante que não há sobreposição de ferramentas no Agente."""
@@ -22,16 +22,15 @@ class TestAgentTools:
         assert len(names) == len(set(names)), "Nomes das ferramentas devem ser únicos."
 
     def test_tools_have_descriptions(self) -> None:
-        """
-        O ReAct Agent depende exclusivamente da 'description' para saber
+        """O ReAct Agent depende exclusivamente da 'description' para saber
         quando usar a ferramenta. Descrições vazias quebram o LLM.
         """
         tools = get_stock_tools()
         for tool in tools:
             assert tool.description is not None
-            assert (
-                len(tool.description) > 15
-            ), f"A ferramenta '{tool.name}' tem uma descrição muito curta."
+            assert len(tool.description) > 15, (
+                f"A ferramenta '{tool.name}' tem uma descrição muito curta."
+            )
 
     def test_tools_contain_required_domain_tools(self) -> None:
         """Garante que as ferramentas de predição LSTM e Base de Conhecimento (RAG) existem."""
@@ -51,9 +50,9 @@ class TestAgentTools:
 
         assert has_prediction, "Ferramenta de predição LSTM não encontrada no Agente."
         # A ferramenta de RAG é vital para o Compliance e para não alucinar sobre dividendos
-        assert (
-            has_rag
-        ), "Ferramenta de consulta à base de conhecimento (RAG) não encontrada."
+        assert has_rag, (
+            "Ferramenta de consulta à base de conhecimento (RAG) não encontrada."
+        )
 
 
 class TestToolExecution:
@@ -61,8 +60,7 @@ class TestToolExecution:
 
     @patch("src.agent.tools.yf.Ticker")
     def test_stock_lookup_mocked(self, mock_ticker) -> None:
-        """
-        Testa a ferramenta de cotação fazendo Mock da biblioteca yfinance,
+        """Testa a ferramenta de cotação fazendo Mock da biblioteca yfinance,
         garantindo que o teste passe mesmo sem internet no GitHub Actions.
         """
         # Configurando o retorno falso da API do Yahoo Finance

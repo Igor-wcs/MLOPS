@@ -1,12 +1,13 @@
-"""
-Sistema de detecção e Anonimização de dados sensíveis PII (Personally Identifiable Information) com Presidio.
+"""Sistema de detecção e Anonimização de dados sensíveis PII.
+
 Especializado para dados brasileiros (CPF, telefone BR). Conformidade com a LGPDM e Mitigação OWASP LLM06.
 """
 
 import logging
 from functools import lru_cache
+from typing import Any
 
-from presidio_analyzer import AnalyzerEngine, PatternRecognizer, Pattern
+from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 from presidio_anonymizer import AnonymizerEngine
 
@@ -15,9 +16,7 @@ logger = logging.getLogger(__name__)
 
 @lru_cache(maxsize=1)
 def get_br_analyzer() -> AnalyzerEngine:
-    """
-    Cria e faz o cache do analisador com reconhecedores brasileiros.
-    """
+    """Cria e faz o cache do analisador com reconhecedores brasileiros."""
     # Configuração explícita do motor NLP para Português
     configuration = {
         "nlp_engine_name": "spacy",
@@ -63,7 +62,8 @@ def get_br_analyzer() -> AnalyzerEngine:
 class PIIDetector:
     """Classe responsável por escanear e anonimizar textos contra PII."""
 
-    def __init__(self, language: str = "pt"):
+    def __init__(self, language: str = "pt") -> None:
+        """Inicializa o detector com suporte a múltiplos idiomas."""
         self.language = language
 
         try:
@@ -85,8 +85,8 @@ class PIIDetector:
             "CREDIT_CARD",
         ]
 
-    def scan(self, text: str) -> list[dict]:
-        """Escaneia o texto em busca de PII e retorna os detalhes dos achados para auditoria."""
+    def scan(self, text: str) -> list[dict[str, Any]]:
+        """Escaneia o texto em busca de PII e retorna os detalhes dos achados."""
         if not self.is_active or not text:
             return []
 
@@ -114,9 +114,8 @@ class PIIDetector:
 
         return findings
 
-    @lru_cache(maxsize=128)
     def anonymize(self, text: str) -> str:
-        """Escaneia o texto e substitui automaticamente o PII por máscaras com cache de resultados."""
+        """Escaneia o texto e substitui automaticamente o PII por máscaras."""
         if not self.is_active or not text:
             return text
 
@@ -134,7 +133,7 @@ class PIIDetector:
             analyzer_results=results,
         )
 
-        return anonymized_result.text
+        return str(anonymized_result.text)
 
     def sanitize_text(self, text: str) -> str:
         """Alias para integração com o OutputGuardrail."""
@@ -143,7 +142,10 @@ class PIIDetector:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    detector = PIIDetector()
-    texto_teste = "O cliente João Silva, portador do CPF 123.456.789-00, solicitou contato no email joao@banco.com."
-    print(f"Original: {texto_teste}")
-    print(f"Anonimizado: {detector.sanitize_text(texto_teste)}")
+    detector_test = PIIDetector()
+    texto_exemplo = (
+        "O cliente João Silva, portador do CPF 123.456.789-00, "
+        "solicitou contato no email joao@banco.com."
+    )
+    logger.info(f"Original: {texto_exemplo}")
+    logger.info(f"Anonimizado: {detector_test.sanitize_text(texto_exemplo)}")

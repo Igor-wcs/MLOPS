@@ -1,32 +1,31 @@
-import torch
 import logging
-import yaml
 from pathlib import Path
-from typing import List
+
+import torch
+import yaml
+from langchain_chroma import Chroma
+from langchain_community.document_loaders import (
+    DirectoryLoader,
+    PyPDFLoader,
+    TextLoader,
+)
 
 # Imports modernos do LangChain v0.3+
 from langchain_core.documents import Document
-from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import (
-    DirectoryLoader,
-    TextLoader,
-    PyPDFLoader,
-)
 
 logger = logging.getLogger(__name__)
 
 
 def load_config() -> dict:
     """Carrega configurações centralizadas do YAML."""
-    with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
+    with open("configs/model_config.yaml", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 class RAGPipeline:
-    """
-    Pipeline RAG (Retrieval-Augmented Generation) Otimizado.
+    """Pipeline RAG (Retrieval-Augmented Generation) Otimizado.
     Mantém o modelo de embeddings e a conexão do banco em memória para baixa latência.
     """
 
@@ -38,7 +37,9 @@ class RAGPipeline:
         self.device = (
             "xpu"
             if hasattr(torch, "xpu") and torch.xpu.is_available()
-            else "cuda" if torch.cuda.is_available() else "cpu"
+            else "cuda"
+            if torch.cuda.is_available()
+            else "cpu"
         )
         logger.info(f"Inicializando Embeddings no device: {self.device}")
 
@@ -65,8 +66,7 @@ class RAGPipeline:
         )
 
     def ingest_directory(self) -> None:
-        """
-        Lê todos os PDFs e TXTs e injeta no ChromaDB de forma incremental.
+        """Lê todos os PDFs e TXTs e injeta no ChromaDB de forma incremental.
         Evita duplicatas básicas verificando se o banco já possui dados antes da ingestão em lote.
         """
         docs_dir = Path(self.docs_dir)
@@ -120,10 +120,8 @@ class RAGPipeline:
             f"Ingestão concluída: {len(chunks)} fragmentos adicionados ao ChromaDB."
         )
 
-    def retrieve(self, query: str, top_k: int = None) -> List[Document]:
-        """
-        Busca os contextos mais relevantes no banco para a pergunta atual.
-        """
+    def retrieve(self, query: str, top_k: int = None) -> list[Document]:
+        """Busca os contextos mais relevantes no banco para a pergunta atual."""
         if not query or not query.strip():
             logger.warning("Query vazia recebida no RAGPipeline.")
             return []

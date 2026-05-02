@@ -1,21 +1,33 @@
 import logging
-import redis
-import yfinance as yf
-import requests
-import pandas as pd
 from datetime import timedelta
+from typing import Any
+
+import pandas as pd
+import redis
+import requests
+import yaml
+import yfinance as yf
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def load_config():
-    with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
+def load_config() -> dict[str, Any]:
+    """Carrega as configurações do modelo."""
+    with open("configs/model_config.yaml", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 class RedisFeatureStore:
-    def __init__(self, host=None, port=None, db=None):
+    """Implementa o Feature Store usando Redis para armazenamento de séries temporais."""
+
+    def __init__(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        db: int | None = None,
+    ) -> None:
+        """Inicializa a conexão com o Redis."""
         cfg = load_config()
         redis_cfg = cfg.get("redis", {})
 
@@ -34,9 +46,9 @@ class RedisFeatureStore:
             logger.error(f"Erro ao conectar ao Redis: {e}")
             raise
 
-    def upsert_incremental(self, ticker: str, df: pd.DataFrame):
-        """
-        Implementa o GAP 03: Upsert Incremental sem destruir o store.
+    def upsert_incremental(self, ticker: str, df: pd.DataFrame) -> None:
+        """Implementa o GAP 03: Upsert Incremental sem destruir o store.
+
         Armazena o vetor multivariado (OHLCV + EMA20) como string JSON.
         """
         cfg = load_config()
@@ -57,7 +69,7 @@ class RedisFeatureStore:
             # Define o TTL para garantir que os dados não expirem antes da janela necessária
             self.client.expire(chave_hash, timedelta(days=ttl_days))
             logger.info(
-                f"✅ {ticker}: Upsert de {len(updates)} vetores multivariados concluído. TTL: {ttl_days} dias."
+                f"✅ {ticker}: Upsert de {len(updates)} vetores concluído. TTL: {ttl_days} dias."
             )
 
     def obter_janela_predicao(self, ticker: str, window_size: int = 30) -> pd.DataFrame:

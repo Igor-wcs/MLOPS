@@ -1,25 +1,20 @@
 import logging
-import yaml
+
 import mlflow
 import numpy as np
-import pandas as pd
-import requests
 import torch
-import torch.nn as nn
-import yfinance as yf
-from datetime import date
+import yaml
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-from torch.utils.data import TensorDataset, DataLoader
+from torch import nn
 
 # Importando componentes internos
-from src.features.feature_engineering import preparar_janelas_temporais
 
 logger = logging.getLogger(__name__)
 
 
 def load_config(config_path: str = "configs/model_config.yaml") -> dict:
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 

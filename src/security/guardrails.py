@@ -1,10 +1,12 @@
-"""
-Guardrails de segurança para input e output do agente.
+"""Guardrails de segurança para input e output do agente.
+
 Implementa proteções contra o OWASP Top 10 for LLM Applications e conformidade LGPD.
 """
 
 import logging
 import re
+from typing import ClassVar
+
 import yaml
 
 # Importa o detector otimizado e focado no Brasil que criamos em pii_detection.py
@@ -16,7 +18,7 @@ logger = logging.getLogger(__name__)
 def load_security_config() -> dict:
     """Carrega as regras de segurança do YAML para evitar hardcode (Governança)."""
     try:
-        with open("configs/monitoring_config.yaml", "r", encoding="utf-8") as f:
+        with open("configs/monitoring_config.yaml", encoding="utf-8") as f:
             cfg = yaml.safe_load(f)
             return cfg.get("security_guardrails", {})
     except Exception as e:
@@ -32,7 +34,7 @@ class InputGuardrail:
     """Valida e sanitiza input do usuário antes de enviar ao LLM."""
 
     # Padrões expandidos para mitigar LLM01: Prompt Injection e Jailbreak (Multi-idioma)
-    INJECTION_PATTERNS = [
+    INJECTION_PATTERNS: ClassVar[list[str]] = [
         # Inglês (Original)
         r"ignore\s+all\s+previous",
         r"you\s+are\s+now\s+a",
@@ -52,7 +54,8 @@ class InputGuardrail:
         r"\[INST\]",
     ]
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Inicializa o guardrail de entrada com configurações carregadas."""
         self.config = load_security_config()
         self.max_length = self.config.get("max_input_tokens", 4096)
         self._compiled_patterns = [
@@ -91,7 +94,8 @@ class InputGuardrail:
 class OutputGuardrail:
     """Valida e sanitiza output do LLM antes de retornar ao usuário (LGPD)."""
 
-    def __init__(self, language: str = "pt"):
+    def __init__(self, language: str = "pt") -> None:
+        """Inicializa o guardrail de saída."""
         self.config = load_security_config()
         self.is_enabled = self.config.get("pii_detection_enabled", True)
 
@@ -115,9 +119,7 @@ class OutputGuardrail:
         anonymized_text = self.detector.sanitize_text(llm_output)
 
         if anonymized_text != llm_output:
-            logger.info(
-                "OutputGuardrail: Dados sensíveis (PII) foram mascarados antes da resposta."
-            )
+            logger.info("OutputGuardrail: PII mascarado antes da resposta.")
 
         return anonymized_text
 
