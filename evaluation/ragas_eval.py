@@ -48,9 +48,7 @@ def generate_rag_responses(golden_set: list[dict]) -> list[dict]:
 
         rag = RAGPipeline()
     except ImportError:
-        logger.warning(
-            "RAGPipeline não encontrado. Simulando recuperação para fins de teste."
-        )
+        logger.warning("RAGPipeline não encontrado. Simulando recuperação para fins de teste.")
         rag = None
 
     results = []
@@ -124,9 +122,7 @@ def evaluate_rag_pipeline(
         return metrics
 
     eval_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o-mini", temperature=0))
-    eval_embeddings = LangchainEmbeddingsWrapper(
-        OpenAIEmbeddings(model="text-embedding-3-small")
-    )
+    eval_embeddings = LangchainEmbeddingsWrapper(OpenAIEmbeddings(model="text-embedding-3-small"))
 
     # Avaliação RAGAS — As 4 métricas obrigatórias da banca
     scores = evaluate(
@@ -146,12 +142,8 @@ def evaluate_rag_pipeline(
     df_results = scores.to_pandas()
     metrics = {
         "ragas_faithfulness": float(df_results["faithfulness"].mean(skipna=True)),
-        "ragas_answer_relevancy": float(
-            df_results["answer_relevancy"].mean(skipna=True)
-        ),
-        "ragas_context_precision": float(
-            df_results["context_precision"].mean(skipna=True)
-        ),
+        "ragas_answer_relevancy": float(df_results["answer_relevancy"].mean(skipna=True)),
+        "ragas_context_precision": float(df_results["context_precision"].mean(skipna=True)),
         "ragas_context_recall": float(df_results["context_recall"].mean(skipna=True)),
     }
 

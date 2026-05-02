@@ -37,9 +37,7 @@ class RedisFeatureStore:
         db = db or redis_cfg.get("db", 0)
 
         try:
-            self.client = redis.Redis(
-                host=host, port=port, db=db, decode_responses=True
-            )
+            self.client = redis.Redis(host=host, port=port, db=db, decode_responses=True)
             self.client.ping()
             logger.info(f"Conectado ao Redis Feature Store ({host}:{port}).")
         except Exception as e:

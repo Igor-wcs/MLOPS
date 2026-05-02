@@ -9,9 +9,7 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 # Configuração de Logs
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s]: %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]: %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -20,9 +18,7 @@ logger = logging.getLogger(__name__)
 # ==========================================
 class EvaluationResult(BaseModel):
     # O Pydantic (ge=1, le=5) já substitui a necessidade da função _clamp_score
-    technical_correctness: int = Field(
-        ge=1, le=5, description="A resposta é factualmente correta?"
-    )
+    technical_correctness: int = Field(ge=1, le=5, description="A resposta é factualmente correta?")
     relevance: int = Field(
         ge=1, le=5, description="A resposta aborda diretamente a pergunta feita?"
     )
@@ -41,9 +37,7 @@ class EvaluationResult(BaseModel):
         le=5,
         description="A resposta inclui avisos de que não é recomendação de investimento?",
     )
-    justification: str = Field(
-        description="Justificativa geral e concisa para as notas aplicadas."
-    )
+    justification: str = Field(description="Justificativa geral e concisa para as notas aplicadas.")
 
 
 # ==========================================
@@ -92,9 +86,7 @@ def run_llm_judge(results_file_path: str = "ragas_detailed_report.csv"):
         llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
         structured_llm = llm.with_structured_output(EvaluationResult)
     except Exception as e:
-        logger.error(
-            f"Falha ao iniciar o LLM Juiz: {e}. Verifique a sua OPENAI_API_KEY no .env."
-        )
+        logger.error(f"Falha ao iniciar o LLM Juiz: {e}. Verifique a sua OPENAI_API_KEY no .env.")
         return
 
     prompt = ChatPromptTemplate.from_messages(

@@ -37,11 +37,7 @@ def compute_sigma_metric(
     Erros acima do threshold (ex: 0.5σ) são inaceitáveis para trading.
     """
     errors = np.abs(y_true - y_pred)
-    sigma = (
-        float(np.std(y_true[-window:]))
-        if len(y_true) >= window
-        else float(np.std(y_true))
-    )
+    sigma = float(np.std(y_true[-window:])) if len(y_true) >= window else float(np.std(y_true))
     sigma = max(sigma, 1e-8)  # Evita divisão por zero
 
     sigma_errors = errors / sigma
@@ -110,9 +106,7 @@ def train_and_log() -> str | None:
     device = torch.device(
         "xpu"
         if hasattr(torch, "xpu") and torch.xpu.is_available()
-        else "cuda"
-        if torch.cuda.is_available()
-        else "cpu"
+        else "cuda" if torch.cuda.is_available() else "cpu"
     )
     logger.info(f"Iniciando treinamento da LSTM utilizando device: {device}")
 
@@ -156,9 +150,7 @@ def train_and_log() -> str | None:
     modelo = get_model(params).to(device)
 
     criterio = nn.MSELoss()
-    otimizador = torch.optim.Adam(
-        modelo.parameters(), lr=cfg["training"]["learning_rate"]
-    )
+    otimizador = torch.optim.Adam(modelo.parameters(), lr=cfg["training"]["learning_rate"])
 
     # --- MLFLOW TRACKING ---
     mlflow.set_experiment(cfg["paths"]["experiment_name"])
@@ -168,9 +160,7 @@ def train_and_log() -> str | None:
         mlflow.set_tag("model_name", "LSTM_Petrobras")
         mlflow.set_tag("model_version", "2.0.0")
         mlflow.set_tag("model_type", "regression_time_series")
-        mlflow.set_tag(
-            "training_data_version", "DVC_DATA_v2"
-        )  # Idealmente viria de comando dvc
+        mlflow.set_tag("training_data_version", "DVC_DATA_v2")  # Idealmente viria de comando dvc
         mlflow.set_tag("owner", "grupo-XX@datathon.com")
         mlflow.set_tag("risk_level", "medium")
         mlflow.set_tag("fairness_checked", "true")
@@ -205,9 +195,7 @@ def train_and_log() -> str | None:
 
             # Desnormalização Multivariada para Reais (R$)
             # Criamos um dummy array para reverter o scaler apenas na coluna Close (index 0)
-            def inverse_transform_target(
-                scaled_val: np.ndarray, scaler_obj: Any
-            ) -> np.ndarray:
+            def inverse_transform_target(scaled_val: np.ndarray, scaler_obj: Any) -> np.ndarray:
                 dummy = np.zeros((len(scaled_val), cfg["model"]["input_size"]))
                 dummy[:, 0] = scaled_val.flatten()
                 return scaler_obj.inverse_transform(dummy)[:, 0].reshape(-1, 1)
@@ -228,9 +216,7 @@ def train_and_log() -> str | None:
                 tolerance=cfg["business_metric"]["tolerance"],
             )
 
-        mlflow.log_metrics(
-            {"rmse_real": rmse_real, "mae_real": mae_real, **sigma_metrics}
-        )
+        mlflow.log_metrics({"rmse_real": rmse_real, "mae_real": mae_real, **sigma_metrics})
 
         # --- SALVAMENTO DE ARTEFATOS ---
         mlflow.pytorch.log_model(

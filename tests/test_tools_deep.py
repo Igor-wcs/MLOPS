@@ -36,9 +36,7 @@ class TestAgentToolsDeep:
     @patch("src.agent.tools.joblib.load")
     @patch("src.agent.tools.get_model")
     @patch("src.agent.tools.yf.Ticker")
-    def test_obter_previsao_lstm_error_handling(
-        self, mock_yf, mock_get_model, mock_joblib
-    ) -> None:
+    def test_obter_previsao_lstm_error_handling(self, mock_yf, mock_get_model, mock_joblib) -> None:
         """Testa o tratamento de erros na ferramenta LSTM (ex: falta de dados)."""
         mock_history = MagicMock()
         mock_history.history.return_value = pd.DataFrame()  # DataFrame vazio

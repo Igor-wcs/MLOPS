@@ -136,9 +136,7 @@ def obter_cotacao_atual(ticker: str) -> str:
             return f"Não foi possível encontrar dados recentes para o ticker {ticker}."
 
         preco_atual = dados["Close"].iloc[-1]
-        return (
-            f"A cotação atual (último fechamento) de {ticker} é R$ {preco_atual:.2f}."
-        )
+        return f"A cotação atual (último fechamento) de {ticker} é R$ {preco_atual:.2f}."
 
     except Exception as e:
         logger.error(f"Erro na tool de cotação: {e}")
@@ -158,7 +156,9 @@ def consultar_base_conhecimento(query: str) -> str:
         contextos = rag.retrieve(query)
 
         if not contextos:
-            return "Não encontrei informações específicas sobre isso na base de conhecimento oficial."
+            return (
+                "Não encontrei informações específicas sobre isso na base de conhecimento oficial."
+            )
 
         # Formata os contextos para o LLM
         resposta_base = "\n\n".join([doc.page_content for doc in contextos])

@@ -15,9 +15,7 @@ def serie_temporal_mock():
 def test_dimensoes_janela_temporal(serie_temporal_mock):
     """Garante que as dimensões do tensor X e array y estão corretas."""
     window_size = 10
-    X, y, scaler = preparar_janelas_temporais(
-        serie_temporal_mock, window_size=window_size
-    )
+    X, y, scaler = preparar_janelas_temporais(serie_temporal_mock, window_size=window_size)
 
     expected_samples = len(serie_temporal_mock) - window_size
     # Agora o modelo espera 6 features
@@ -33,6 +31,4 @@ def test_escalonamento_limites(serie_temporal_mock):
 
     # Verificamos a primeira janela (que é garantidamente do set de treino)
     assert np.min(X[0]) >= -1e-7, f"Valor mínimo {np.min(X[0])} menor que 0 no treino"
-    assert np.max(X[0]) <= 1.0 + 1e-7, (
-        f"Valor máximo {np.max(X[0])} maior que 1 no treino"
-    )
+    assert np.max(X[0]) <= 1.0 + 1e-7, f"Valor máximo {np.max(X[0])} maior que 1 no treino"

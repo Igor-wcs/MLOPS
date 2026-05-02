@@ -90,9 +90,7 @@ def run_demo() -> None:
     log_header("ETAPA 5: MATURIDADE MLOPS & ENGENHARIA")
 
     print("\n[1/3] Verificando Cobertura de Testes (Meta > 60%)...")
-    subprocess.run(
-        "python -m pytest tests --cov=src --cov-report=term-missing", shell=True
-    )
+    subprocess.run("python -m pytest tests --cov=src --cov-report=term-missing", shell=True)
 
     print("\n[2/3] Abrindo Relatório de Drift (Evidently)...")
     caminho_drift = os.path.abspath("drift_report.html")

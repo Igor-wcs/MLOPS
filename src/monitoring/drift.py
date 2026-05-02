@@ -60,9 +60,7 @@ def gerar_relatorio_drift() -> float:
     device = torch.device(
         "xpu"
         if hasattr(torch, "xpu") and torch.xpu.is_available()
-        else "cuda"
-        if torch.cuda.is_available()
-        else "cpu"
+        else "cuda" if torch.cuda.is_available() else "cpu"
     )
 
     logger.info(f"Iniciando análise de Drift para {ticker} usando {device}...")
@@ -78,18 +76,14 @@ def gerar_relatorio_drift() -> float:
         df_yf = tkt.history(period=ref_period)
 
         if len(df_yf) < mon_cfg["drift"].get("min_samples", 50):
-            raise ValueError(
-                f"Dados insuficientes para análise: {len(df_yf)} amostras."
-            )
+            raise ValueError(f"Dados insuficientes para análise: {len(df_yf)} amostras.")
 
         # Feature Engineering Multivariada
         df_yf["EMA20"] = df_yf["Close"].ewm(span=20, adjust=False).mean()
         df_yf = df_yf[["Close", "Open", "High", "Low", "Volume", "EMA20"]].dropna()
         dados_input = df_yf.values
     except Exception as e:
-        logger.warning(
-            f"Falha na coleta de dados: {e}. Usando fallback de dados sintéticos."
-        )
+        logger.warning(f"Falha na coleta de dados: {e}. Usando fallback de dados sintéticos.")
         # Fallback de dados sintéticos (Mock)
         dados_input = np.random.randn(200, 6)
 
@@ -108,9 +102,7 @@ def gerar_relatorio_drift() -> float:
             colunas_features.append(f"{feat}_t-{t}")
 
     df_ref = pd.DataFrame(X_ref_np.reshape(len(X_ref_np), -1), columns=colunas_features)
-    df_curr = pd.DataFrame(
-        X_curr_np.reshape(len(X_curr_np), -1), columns=colunas_features
-    )
+    df_curr = pd.DataFrame(X_curr_np.reshape(len(X_curr_np), -1), columns=colunas_features)
 
     # 5. Geração de Predições para Target Drift
     nome_modelo = model_cfg["paths"]["registered_model_name"]
@@ -120,14 +112,10 @@ def gerar_relatorio_drift() -> float:
         try:
             with torch.no_grad():
                 preds_ref = (
-                    modelo(torch.tensor(X_ref_np, dtype=torch.float32).to(device))
-                    .cpu()
-                    .numpy()
+                    modelo(torch.tensor(X_ref_np, dtype=torch.float32).to(device)).cpu().numpy()
                 )
                 preds_curr = (
-                    modelo(torch.tensor(X_curr_np, dtype=torch.float32).to(device))
-                    .cpu()
-                    .numpy()
+                    modelo(torch.tensor(X_curr_np, dtype=torch.float32).to(device)).cpu().numpy()
                 )
 
             df_ref["prediction"] = preds_ref.flatten()
@@ -171,9 +159,7 @@ def gerar_relatorio_drift() -> float:
             mlflow.set_tag("status", "CRITICAL_DRIFT")
             return float(drift_share)
         else:
-            logger.info(
-                f"✅ Estabilidade confirmada. Drift atual: {drift_share * 100:.1f}%."
-            )
+            logger.info(f"✅ Estabilidade confirmada. Drift atual: {drift_share * 100:.1f}%.")
             mlflow.set_tag("status", "HEALTHY")
             return float(drift_share)
 

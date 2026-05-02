@@ -15,9 +15,7 @@ class TestDriftMonitoring:
     @patch("src.monitoring.drift.yf.Ticker")
     @patch("src.monitoring.drift.MlflowClient")
     @patch("src.monitoring.drift.obter_modelo_producao")
-    def test_drift_execution_flow(
-        self, mock_get_model, mock_mlflow_client, mock_ticker
-    ) -> None:
+    def test_drift_execution_flow(self, mock_get_model, mock_mlflow_client, mock_ticker) -> None:
         """Testa o fluxo completo do drift report com mocks de dados e modelo."""
         # 1. Mock de dados do Yahoo Finance (Suficientes para não cair no fallback total)
         mock_history = MagicMock()
@@ -34,9 +32,7 @@ class TestDriftMonitoring:
         # 2. Mock do modelo no MLflow Registry
         mock_version = MagicMock()
         mock_version.version = "1"
-        mock_mlflow_client.return_value.search_model_versions.return_value = [
-            mock_version
-        ]
+        mock_mlflow_client.return_value.search_model_versions.return_value = [mock_version]
 
         # Forçamos modelo como None para usar apenas DataDriftPreset() real,
         # evitando o erro de 'prediction column' e problemas de tipo com Mocks no Evidently.

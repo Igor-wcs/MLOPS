@@ -30,9 +30,7 @@ def executar_benchmark():
     device = torch.device(
         "xpu"
         if hasattr(torch, "xpu") and torch.xpu.is_available()
-        else "cuda"
-        if torch.cuda.is_available()
-        else "cpu"
+        else "cuda" if torch.cuda.is_available() else "cpu"
     )
 
     model = AutoModelForCausalLM.from_pretrained(
@@ -47,9 +45,7 @@ def executar_benchmark():
 
     # Aquecimento (Warm-up)
     with torch.inference_mode():
-        _ = model.generate(
-            ids, max_new_tokens=8, do_sample=False, pad_token_id=tok.eos_token_id
-        )
+        _ = model.generate(ids, max_new_tokens=8, do_sample=False, pad_token_id=tok.eos_token_id)
 
     N = 10  # Número de chamadas por teste
     configuracoes_tokens = [16, 64, 128]
@@ -69,9 +65,7 @@ def executar_benchmark():
 
             with torch.inference_mode():
                 for i in range(N):
-                    ids_teste = tok(prompt + str(i), return_tensors="pt").input_ids.to(
-                        device
-                    )
+                    ids_teste = tok(prompt + str(i), return_tensors="pt").input_ids.to(device)
                     _ = model.generate(
                         ids_teste,
                         max_new_tokens=max_tokens,
@@ -82,9 +76,7 @@ def executar_benchmark():
             dt = time.time() - t_inicio
             avg_ms = (dt / N) * 1000
 
-            logger.info(
-                f"Resultado: {N} chamadas em {dt:.2f}s => {avg_ms:.1f} ms/chamada\n"
-            )
+            logger.info(f"Resultado: {N} chamadas em {dt:.2f}s => {avg_ms:.1f} ms/chamada\n")
 
             # Log de métricas por configuração
             mlflow.log_metric(f"latency_ms_avg_{max_tokens}tokens", avg_ms)
