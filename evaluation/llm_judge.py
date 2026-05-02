@@ -1,172 +1,125 @@
+import json
 import logging
-from pathlib import Path
+import os
 
-import mlflow
 import pandas as pd
-import yaml
+from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 # Configuração de Logs
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]: %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
-
-# ==========================================
-# SCHEMAS DO JUIZ (Com validação nativa)
-# ==========================================
-class EvaluationResult(BaseModel):
-    # O Pydantic (ge=1, le=5) já substitui a necessidade da função _clamp_score
-    technical_correctness: int = Field(ge=1, le=5, description="A resposta é factualmente correta?")
-    relevance: int = Field(
-        ge=1, le=5, description="A resposta aborda diretamente a pergunta feita?"
-    )
-    clarity: int = Field(
-        ge=1,
-        le=5,
-        description="A resposta é clara, bem organizada e fácil de entender?",
-    )
-    investor_utility: int = Field(
-        ge=1,
-        le=5,
-        description="A resposta fornece informações úteis para tomada de decisão de negócio?",
-    )
-    risk_disclaimers: int = Field(
-        ge=1,
-        le=5,
-        description="A resposta inclui avisos de que não é recomendação de investimento?",
-    )
-    justification: str = Field(description="Justificativa geral e concisa para as notas aplicadas.")
+load_dotenv()
 
 
 # ==========================================
-#  PROMPT DO JUIZ
+# 1. SCHEMA DE AVALIAÇÃO (Pydantic)
+# ==========================================
+class EvaluationScore(BaseModel):
+    """Schema para o LLM Juiz retornar notas estruturadas."""
+
+    fidelidade: int = Field(description="Nota de 1 a 5 para fidelidade ao contexto (hallucination)")
+    relevancia: int = Field(description="Nota de 1 a 5 para relevância à pergunta")
+    comentario: str = Field(description="Breve explicação da nota")
+
+
+# ==========================================
+# 2. PROMPT DO JUIZ
 # ==========================================
 JUDGE_SYSTEM_PROMPT = """Você é um avaliador especializado em sistemas de análise financeira.
-Avalie a resposta do assistente comparando-a com a Pergunta e o Gabarito Esperado, considerando o contexto esperado.
+Avalie a resposta do assistente comparando-a com a Pergunta e o Gabarito Esperado.
+Considere o contexto esperado para a análise.
 
 Atribua notas rigorosas de 1 a 5 para os seguintes critérios:
-1. Correção Técnica
-2. Relevância
-3. Clareza
-4. Utilidade para Investidor
-5. Disclaimers de Risco (Se a pergunta não exige disclaimer, dê nota 5 por padrão).
-"""
+1. Fidelidade: A resposta condiz com os fatos do gabarito? (5=Total, 1=Invenção)
+2. Relevância: A resposta atende ao que foi perguntado? (5=Direta, 1=Fugiu do tema)
+
+Responda APENAS em formato JSON."""
+
+# ==========================================
+# 3. CLASSE DO JUIZ
+# ==========================================
 
 
-def load_config() -> dict:
-    with open("configs/model_config.yaml", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+class LLMJudge:
+    """Juiz Sintético (LLM-as-a-Judge) para validar qualidade do Agente ReAct."""
 
+    def __init__(self, model: str = "gpt-4o-mini") -> None:
+        if not os.environ.get("OPENAI_API_KEY"):
+            raise ValueError("OPENAI_API_KEY não encontrada no ambiente.")
 
-def run_llm_judge(results_file_path: str = "ragas_detailed_report.csv"):
-    """Avalia as respostas (já geradas pelo RAGAS) usando LLM-as-a-judge
-    com 5 critérios de negócio e registra no MLflow.
-    """
-    cfg = load_config()
-    file_path = Path(results_file_path)
+        self.llm = ChatOpenAI(model=model, temperature=0).with_structured_output(EvaluationScore)
 
-    if not file_path.exists():
-        logger.error(
-            f"Arquivo '{results_file_path}' não encontrado. Rode o ragas_eval.py primeiro."
+        self.prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", JUDGE_SYSTEM_PROMPT),
+                (
+                    "human",
+                    "PERGUNTA: {question}\nGABARITO ESPERADO: {ground_truth}\n"
+                    "RESPOSTA DO ASSISTENTE: {answer}",
+                ),
+            ]
         )
-        return
 
-    # 1. Lê as respostas que o pipeline já gerou (Evita reprocessamento)
-    df = pd.read_csv(file_path)
-    required_cols = ["question", "answer", "ground_truth"]
-    if not all(col in df.columns for col in required_cols):
-        logger.error(f"O CSV precisa conter as colunas: {required_cols}")
-        return
+    def evaluate(self, question: str, ground_truth: str, answer: str) -> EvaluationScore:
+        """Executa a avaliação de uma única resposta."""
+        chain = self.prompt | self.llm
+        return chain.invoke({"question": question, "ground_truth": ground_truth, "answer": answer})
 
-    logger.info("Inicializando o LLM Juiz (GPT-4o-mini)...")
+
+# ==========================================
+# 4. EXECUÇÃO DO BENCHMARK DE QUALIDADE
+# ==========================================
+
+
+def run_llm_judge() -> None:
+    """Roda a avaliação em lote sobre o Golden Set."""
+    logger.info("\n--- INICIANDO LLM-AS-A-JUDGE (QUALIDADE AGENTE) ---")
+
+    # Carrega Golden Set
     try:
-        # LangChain Wrapper com Structured Output
-        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
-        structured_llm = llm.with_structured_output(EvaluationResult)
-    except Exception as e:
-        logger.error(f"Falha ao iniciar o LLM Juiz: {e}. Verifique a sua OPENAI_API_KEY no .env.")
+        with open("data/golden_set/golden_set.json", encoding="utf-8") as f:
+            golden_data = json.load(f)
+    except FileNotFoundError:
+        logger.error("Golden Set não encontrado em data/golden_set/golden_set.json")
         return
 
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", JUDGE_SYSTEM_PROMPT),
-            (
-                "human",
-                "PERGUNTA: {question}\nGABARITO ESPERADO: {ground_truth}\nRESPOSTA DO ASSISTENTE: {answer}",
-            ),
-        ]
-    )
+    judge = LLMJudge()
+    results = []
 
-    judge_chain = prompt | structured_llm
+    for item in golden_data:
+        logger.info(f"Avaliando: {item['question'][:50]}...")
 
-    # 2. Execução e Rastreamento (MLflow)
-    mlflow.set_experiment(cfg["paths"]["experiment_name"])
+        # Aqui simulamos ou chamamos a API real do nosso Agente
+        # Para o benchmark, assumimos que temos as respostas salvas ou chamamos local
+        # mock_answer = "A Petrobras planeja investir US$ 102 bilhões entre 2024 e 2028."
+        answer = item.get("actual_answer", "Resposta não coletada.")
 
-    with mlflow.start_run(run_name="Avaliacao_LLM_Judge") as run:
-        mlflow.set_tag("phase", "datathon-fase05")
-        mlflow.set_tag("evaluation_type", "llm-as-a-judge")
+        score = judge.evaluate(
+            question=item["question"], ground_truth=item["ground_truth"], answer=answer
+        )
 
-        evaluations = []
-        logger.info(f"Julgando {len(df)} respostas com 5 critérios rigorosos...")
+        results.append(
+            {
+                "question": item["question"],
+                "fidelidade": score.fidelidade,
+                "relevancia": score.relevancia,
+                "comentario": score.comentario,
+            }
+        )
 
-        for idx, row in df.iterrows():
-            try:
-                result: EvaluationResult = judge_chain.invoke(
-                    {
-                        "question": row.get("question", ""),
-                        "ground_truth": row.get("ground_truth", ""),
-                        "answer": row.get("answer", ""),
-                    }
-                )
+    # Consolidação
+    df = pd.DataFrame(results)
+    logger.info("\n" + "=" * 30)
+    logger.info(f"Média Fidelidade: {df['fidelidade'].mean():.2f}/5")
+    logger.info(f"Média Relevância: {df['relevancia'].mean():.2f}/5")
+    logger.info("=" * 30)
 
-                # O Pydantic já garantiu que os valores estão entre 1 e 5
-                evaluations.append(
-                    {
-                        "question": row.get("question", ""),
-                        "technical_correctness": result.technical_correctness,
-                        "relevance": result.relevance,
-                        "clarity": result.clarity,
-                        "investor_utility": result.investor_utility,
-                        "risk_disclaimers": result.risk_disclaimers,
-                        "overall_score": (
-                            result.technical_correctness
-                            + result.relevance
-                            + result.clarity
-                            + result.investor_utility
-                            + result.risk_disclaimers
-                        )
-                        / 5.0,
-                        "justification": result.justification,
-                    }
-                )
-            except Exception as e:
-                logger.warning(f"Falha ao avaliar a linha {idx}: {e}")
-
-        # 3. Consolidação de Métricas
-        df_evals = pd.DataFrame(evaluations)
-        if df_evals.empty:
-            return
-
-        avg_metrics = {
-            "judge_technical_avg": df_evals["technical_correctness"].mean(),
-            "judge_relevance_avg": df_evals["relevance"].mean(),
-            "judge_clarity_avg": df_evals["clarity"].mean(),
-            "judge_utility_avg": df_evals["investor_utility"].mean(),
-            "judge_disclaimer_avg": df_evals["risk_disclaimers"].mean(),
-            "judge_overall_avg": df_evals["overall_score"].mean(),
-        }
-
-        mlflow.log_metrics(avg_metrics)
-        logger.info(f"Métricas Médias do Juiz: {avg_metrics}")
-
-        # Exportação de Artefatos
-        report_path = "llm_judge_detailed_report.csv"
-        df_evals.to_csv(report_path, index=False)
-        mlflow.log_artifact(report_path)
-
-        logger.info("Julgamento finalizado. CSV de auditoria salvo no MLflow.")
+    df.to_csv("llm_judge_results.csv", index=False)
+    logger.info("Relatório detalhado salvo em llm_judge_results.csv")
 
 
 if __name__ == "__main__":

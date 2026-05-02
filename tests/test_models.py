@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 import torch
+from pydantic import ValidationError
 
 from src.models.lstm_factory import get_model
 from src.models.lstm_model import StockLSTM
@@ -42,7 +43,7 @@ class TestLSTMFactory:
         model = get_model(params)
 
         x = torch.randn(2, 10, 6)
-        # Se o forward pass completar sem erro de RuntimeError: Expected all tensors to be on the same device
+        # Se o forward pass completar sem erro de RuntimeError
         # significa que h0/c0 foram criados corretamente via x.device
         try:
             _ = model(x)
@@ -61,16 +62,16 @@ class TestLSTMParams:
 
     def test_invalid_input_size(self) -> None:
         """Pydantic deve falhar para valores fora do range ou tipos errados."""
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             LSTMParams(hidden_size=5)  # ge=16
 
     def test_dropout_range(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             LSTMParams(input_size=6, dropout=1.5)
 
 
 class TestSigmaMetric:
-    """Testes da métrica de negócio (Tolerância de erro baseada em Volatilidade σ)."""
+    """Testes da métrica de negócio (Tolerância de erro baseada em Volatilidade sigma)."""
 
     def test_perfect_prediction(self) -> None:
         y_true = np.array([100.0, 101.0, 102.0, 103.0, 104.0])

@@ -92,7 +92,8 @@ class RedisFeatureStore:
         return df_result
 
 
-def executar_atualizacao_diaria():
+def executar_atualizacao_diaria() -> None:
+    """Executa a rotina diária de atualização do Feature Store com dados do Yahoo Finance."""
     store = RedisFeatureStore()
     ticker = "PETR4.SA"
 

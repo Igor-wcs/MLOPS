@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from src.agent.tools import get_stock_tools
+from src.agent.tools import get_stock_tools, obter_cotacao_atual
 
 
 class TestAgentTools:
@@ -26,9 +26,9 @@ class TestAgentTools:
         tools = get_stock_tools()
         for tool in tools:
             assert tool.description is not None
-            assert (
-                len(tool.description) > 15
-            ), f"A ferramenta '{tool.name}' tem uma descrição muito curta."
+            assert len(tool.description) > 15, (
+                f"A ferramenta '{tool.name}' tem uma descrição muito curta."
+            )
 
     def test_tools_contain_required_domain_tools(self) -> None:
         """Garante que as ferramentas de predição LSTM e Base de Conhecimento (RAG) existem."""
@@ -70,8 +70,6 @@ class TestToolExecution:
 
     def test_invalid_ticker_handling(self) -> None:
         """Garante que o Agente não quebre a API se o usuário digitar um Ticker que não existe."""
-        from src.agent.tools import obter_cotacao_atual
-
         result = obter_cotacao_atual.run("TICKER_FALSO_123")
         assert (
             "possível" in result.lower()

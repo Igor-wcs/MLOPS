@@ -26,10 +26,11 @@ def load_config() -> dict:
 
 class RAGPipeline:
     """Pipeline RAG (Retrieval-Augmented Generation) Otimizado.
+
     Mantém o modelo de embeddings e a conexão do banco em memória para baixa latência.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.cfg = load_config()
         self.rag_cfg = self.cfg.get("rag", {})
 
@@ -37,7 +38,9 @@ class RAGPipeline:
         self.device = (
             "xpu"
             if hasattr(torch, "xpu") and torch.xpu.is_available()
-            else "cuda" if torch.cuda.is_available() else "cpu"
+            else "cuda"
+            if torch.cuda.is_available()
+            else "cpu"
         )
         logger.info(f"Inicializando Embeddings no device: {self.device}")
 
@@ -63,6 +66,7 @@ class RAGPipeline:
 
     def ingest_directory(self) -> None:
         """Lê todos os PDFs e TXTs e injeta no ChromaDB de forma incremental.
+
         Evita duplicatas básicas verificando se o banco já possui dados antes da ingestão em lote.
         """
         docs_dir = Path(self.docs_dir)
@@ -77,7 +81,8 @@ class RAGPipeline:
             count = self.vector_store._collection.count()
             if count > 0:
                 logger.info(
-                    f"O banco vetorial já possui {count} documentos. Pulando ingestão completa para evitar duplicatas."
+                    f"O banco vetorial já possui {count} documentos. "
+                    "Pulando ingestão completa para evitar duplicatas."
                 )
                 return
         except Exception as e:
@@ -108,7 +113,7 @@ class RAGPipeline:
         self.vector_store.add_documents(documents=chunks)
         logger.info(f"Ingestão concluída: {len(chunks)} fragmentos adicionados ao ChromaDB.")
 
-    def retrieve(self, query: str, top_k: int = None) -> list[Document]:
+    def retrieve(self, query: str, top_k: int | None = None) -> list[Document]:
         """Busca os contextos mais relevantes no banco para a pergunta atual."""
         if not query or not query.strip():
             logger.warning("Query vazia recebida no RAGPipeline.")

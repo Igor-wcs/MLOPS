@@ -29,7 +29,7 @@ def load_config() -> dict:
 
 
 # Singleton para o RAG para evitar recarregar embeddings em cada chamada
-_rag_pipeline_instance: RAGPipeline | None = None
+_RAG_CACHE: dict[str, RAGPipeline | None] = {"instance": None}
 
 
 def get_project_root() -> Path:
@@ -43,15 +43,16 @@ def get_rag_pipeline() -> RAGPipeline:
     Returns:
         Objeto RAGPipeline inicializado.
     """
-    global _rag_pipeline_instance
-    if _rag_pipeline_instance is None:
-        _rag_pipeline_instance = RAGPipeline()
-    return _rag_pipeline_instance
+    if _RAG_CACHE["instance"] is None:
+        _RAG_CACHE["instance"] = RAGPipeline()
+    return _RAG_CACHE["instance"]
 
 
 @tool
 def obter_previsao_lstm(ticker: str) -> str:
-    """ÚTIL PARA: Obter a predição futura do preço de uma ação usando o modelo de Inteligência Artificial LSTM interno.
+    """ÚTIL PARA: Obter a predição futura do preço de uma ação.
+
+    Usa o modelo de Inteligência Artificial LSTM interno.
     ENTRADA: O código da ação (exemplo: 'PETR4.SA').
     SAÍDA: O preço previsto em Reais (R$) para o próximo dia útil.
     """
@@ -83,7 +84,8 @@ def obter_previsao_lstm(ticker: str) -> str:
             modelo.load_state_dict(torch.load(model_weights_path, map_location="cpu"))
         else:
             logger.warning(
-                f"Pesos do modelo não encontrados em {model_weights_path}. Usando modelo não treinado."
+                f"Pesos do modelo não encontrados em {model_weights_path}. "
+                "Usando modelo não treinado."
             )
 
         modelo.eval()
@@ -115,16 +117,23 @@ def obter_previsao_lstm(ticker: str) -> str:
         dummy[0, 0] = prediction_scaled[0, 0]
         prediction_real = scaler.inverse_transform(dummy)[0, 0]
 
-        return f"A previsão do modelo LSTM para o fechamento de {ticker} no próximo dia útil é de R$ {prediction_real:.2f}."
+        return (
+            f"A previsão do modelo LSTM para o fechamento de {ticker} "
+            f"no próximo dia útil é de R$ {prediction_real:.2f}."
+        )
 
     except Exception as e:
         logger.error(f"Erro na tool LSTM: {e}")
-        return f"Erro ao calcular previsão para {ticker}. Verifique se o modelo foi treinado e o scaler gerado."
+        return (
+            f"Erro ao calcular previsão para {ticker}. "
+            "Verifique se o modelo foi treinado e o scaler gerado."
+        )
 
 
 @tool
 def obter_cotacao_atual(ticker: str) -> str:
-    """ÚTIL PARA: Obter o preço de fechamento mais recente (tempo real/hoje) de uma ação no mercado.
+    """ÚTIL PARA: Obter o preço de fechamento mais recente de uma ação no mercado.
+
     ENTRADA: O código da ação (exemplo: 'PETR4.SA').
     SAÍDA: O preço atual da ação no mercado.
     """
@@ -145,8 +154,9 @@ def obter_cotacao_atual(ticker: str) -> str:
 
 @tool
 def consultar_base_conhecimento(query: str) -> str:
-    """ÚTIL PARA: Responder perguntas teóricas sobre o negócio, regras de compliance,
-    políticas da empresa ou detalhes técnicos dos modelos.
+    """ÚTIL PARA: Responder perguntas teóricas sobre o negócio.
+
+    Inclui regras de compliance, políticas da empresa ou detalhes técnicos dos modelos.
     ENTRADA: A pergunta do usuário.
     SAÍDA: A resposta extraída dos documentos oficiais da empresa.
     """
@@ -169,6 +179,6 @@ def consultar_base_conhecimento(query: str) -> str:
         return "Erro ao consultar o banco de vetores de conhecimento."
 
 
-def get_stock_tools():
+def get_stock_tools() -> list:
     """Retorna a lista de ferramentas que o Agente ReAct pode utilizar."""
     return [obter_previsao_lstm, obter_cotacao_atual, consultar_base_conhecimento]

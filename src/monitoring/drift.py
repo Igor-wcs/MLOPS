@@ -10,6 +10,7 @@ import yfinance as yf
 from evidently.metric_preset import DataDriftPreset, TargetDriftPreset
 from evidently.report import Report
 from mlflow.tracking import MlflowClient
+from torch import nn
 
 # Importando a nossa preparação de dados
 from src.features.feature_engineering import preparar_janelas_temporais
@@ -27,7 +28,7 @@ def load_configs() -> tuple[dict, dict]:
     return model_cfg, mon_cfg
 
 
-def obter_modelo_producao(model_name: str, device: torch.device):
+def obter_modelo_producao(model_name: str, device: torch.device) -> nn.Module | None:
     """Busca a versão mais recente do modelo no MLflow Registry e aloca no device correto."""
     logger.info(f"Buscando o modelo '{model_name}' no Registry...")
     client = MlflowClient()
@@ -51,7 +52,8 @@ def obter_modelo_producao(model_name: str, device: torch.device):
         return None
 
 
-def gerar_relatorio_drift() -> float:
+def gerar_relatorio_drift() -> float:  # noqa: PLR0915
+    """Gera um relatório de drift comparando dados históricos com recentes."""
     # 1. Carregamento de Configurações e Hardware
     model_cfg, mon_cfg = load_configs()
     ticker = model_cfg["data"]["ticker"]
@@ -60,7 +62,9 @@ def gerar_relatorio_drift() -> float:
     device = torch.device(
         "xpu"
         if hasattr(torch, "xpu") and torch.xpu.is_available()
-        else "cuda" if torch.cuda.is_available() else "cpu"
+        else "cuda"
+        if torch.cuda.is_available()
+        else "cpu"
     )
 
     logger.info(f"Iniciando análise de Drift para {ticker} usando {device}...")
@@ -88,11 +92,11 @@ def gerar_relatorio_drift() -> float:
         dados_input = np.random.randn(200, 6)
 
     # 3. Preparação das janelas temporais
-    X, y, _ = preparar_janelas_temporais(dados_input, window_size)
+    x_windows, _y, _ = preparar_janelas_temporais(dados_input, window_size)
 
     # 4. Split de Referência (Passado) vs Atual (Recente)
-    split = len(X) - 30
-    X_ref_np, X_curr_np = X[:split], X[split:]
+    split = len(x_windows) - 30
+    x_ref_np, x_curr_np = x_windows[:split], x_windows[split:]
 
     # Criando nomes de colunas para as features multivariadas
     features_base = ["Close", "Open", "High", "Low", "Volume", "EMA20"]
@@ -101,8 +105,8 @@ def gerar_relatorio_drift() -> float:
         for feat in features_base:
             colunas_features.append(f"{feat}_t-{t}")
 
-    df_ref = pd.DataFrame(X_ref_np.reshape(len(X_ref_np), -1), columns=colunas_features)
-    df_curr = pd.DataFrame(X_curr_np.reshape(len(X_curr_np), -1), columns=colunas_features)
+    df_ref = pd.DataFrame(x_ref_np.reshape(len(x_ref_np), -1), columns=colunas_features)
+    df_curr = pd.DataFrame(x_curr_np.reshape(len(x_curr_np), -1), columns=colunas_features)
 
     # 5. Geração de Predições para Target Drift
     nome_modelo = model_cfg["paths"]["registered_model_name"]
@@ -112,10 +116,10 @@ def gerar_relatorio_drift() -> float:
         try:
             with torch.no_grad():
                 preds_ref = (
-                    modelo(torch.tensor(X_ref_np, dtype=torch.float32).to(device)).cpu().numpy()
+                    modelo(torch.tensor(x_ref_np, dtype=torch.float32).to(device)).cpu().numpy()
                 )
                 preds_curr = (
-                    modelo(torch.tensor(X_curr_np, dtype=torch.float32).to(device)).cpu().numpy()
+                    modelo(torch.tensor(x_curr_np, dtype=torch.float32).to(device)).cpu().numpy()
                 )
 
             df_ref["prediction"] = preds_ref.flatten()
@@ -154,14 +158,15 @@ def gerar_relatorio_drift() -> float:
         retrain_th = mon_cfg["drift"]["retrain_threshold"]
         if drift_share > retrain_th:
             logger.warning(
-                f"🚨 ALERTA CRÍTICO: Degradação detectada ({drift_share * 100:.1f}%). Necessário Retreino."
+                f"🚨 ALERTA CRÍTICO: Degradação detectada ({drift_share * 100:.1f}%). "
+                "Necessário Retreino."
             )
             mlflow.set_tag("status", "CRITICAL_DRIFT")
             return float(drift_share)
-        else:
-            logger.info(f"✅ Estabilidade confirmada. Drift atual: {drift_share * 100:.1f}%.")
-            mlflow.set_tag("status", "HEALTHY")
-            return float(drift_share)
+
+        logger.info(f"✅ Estabilidade confirmada. Drift atual: {drift_share * 100:.1f}%.")
+        mlflow.set_tag("status", "HEALTHY")
+        return float(drift_share)
 
 
 if __name__ == "__main__":

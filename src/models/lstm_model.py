@@ -4,6 +4,7 @@ from torch import nn
 
 class StockLSTM(nn.Module):
     """Arquitetura LSTM para predição de séries temporais financeiras.
+
     Suporta inicialização de estados e aceleração via hardware.
     """
 
@@ -14,7 +15,7 @@ class StockLSTM(nn.Module):
         output_size: int,
         num_layers: int,
         dropout_rate: float,
-    ):
+    ) -> None:
         super().__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers

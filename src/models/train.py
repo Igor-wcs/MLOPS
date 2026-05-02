@@ -34,7 +34,8 @@ def compute_sigma_metric(
     y_true: np.ndarray, y_pred: np.ndarray, window: int = 30, tolerance: float = 0.5
 ) -> dict:
     """Calcula a métrica de negócio: erro em desvios-padrão.
-    Erros acima do threshold (ex: 0.5σ) são inaceitáveis para trading.
+
+    Erros acima do threshold (ex: 0.5 sigma) são inaceitáveis para trading.
     """
     errors = np.abs(y_true - y_pred)
     sigma = float(np.std(y_true[-window:])) if len(y_true) >= window else float(np.std(y_true))
@@ -61,12 +62,12 @@ def train_epoch(
     model.train()
     total_loss = 0.0
 
-    for X_batch, y_batch in loader:
-        X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+    for x_batch, y_batch in loader:
+        x_batch_dev, y_batch_dev = x_batch.to(device), y_batch.to(device)
 
         optimizer.zero_grad()
-        output = model(X_batch)
-        loss = criterion(output, y_batch)
+        output = model(x_batch_dev)
+        loss = criterion(output, y_batch_dev)
         loss.backward()
         optimizer.step()
 
@@ -82,10 +83,10 @@ def evaluate_model(model: nn.Module, loader: DataLoader, device: torch.device) -
     total_loss = 0.0
     criterion = nn.MSELoss()
 
-    for X_batch, y_batch in loader:
-        X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-        output = model(X_batch)
-        loss = criterion(output, y_batch)
+    for x_batch, y_batch in loader:
+        x_batch_dev, y_batch_dev = x_batch.to(device), y_batch.to(device)
+        output = model(x_batch_dev)
+        loss = criterion(output, y_batch_dev)
         total_loss += loss.item()
 
     return total_loss / max(len(loader), 1)
@@ -96,7 +97,7 @@ def evaluate_model(model: nn.Module, loader: DataLoader, device: torch.device) -
 # ==========================================
 
 
-def train_and_log() -> str | None:
+def train_and_log() -> str | None:  # noqa: PLR0915
     """Orquestra o treino, avaliação e tracking no MLflow usando dados do DVC."""
     cfg = load_config()
     ticker = cfg["data"]["ticker"]
@@ -106,34 +107,36 @@ def train_and_log() -> str | None:
     device = torch.device(
         "xpu"
         if hasattr(torch, "xpu") and torch.xpu.is_available()
-        else "cuda" if torch.cuda.is_available() else "cpu"
+        else "cuda"
+        if torch.cuda.is_available()
+        else "cpu"
     )
     logger.info(f"Iniciando treinamento da LSTM utilizando device: {device}")
 
     # --- CARREGAMENTO DE DADOS (DVC OUTS) ---
     try:
-        X = np.load("data/processed/X.npy")
-        y = np.load("data/processed/y.npy")
+        x_all = np.load("data/processed/X.npy")
+        y_all = np.load("data/processed/y.npy")
         scaler = joblib.load("data/processed/scaler_temp.pkl")
         logger.info("Dados e Scaler carregados do diretório data/processed")
     except FileNotFoundError:
         logger.error("Arquivos de features não encontrados. Rode 'dvc repro' primeiro.")
-        return
+        return None
 
-    split_idx = int(len(X) * (1 - cfg["data"]["test_size"]))
+    split_idx = int(len(x_all) * (1 - cfg["data"]["test_size"]))
 
-    X_train_t = torch.tensor(X[:split_idx], dtype=torch.float32)
-    y_train_t = torch.tensor(y[:split_idx], dtype=torch.float32).view(-1, 1)
-    X_test_t = torch.tensor(X[split_idx:], dtype=torch.float32)
-    y_test_t = torch.tensor(y[split_idx:], dtype=torch.float32).view(-1, 1)
+    x_train_t = torch.tensor(x_all[:split_idx], dtype=torch.float32)
+    y_train_t = torch.tensor(y_all[:split_idx], dtype=torch.float32).view(-1, 1)
+    x_test_t = torch.tensor(x_all[split_idx:], dtype=torch.float32)
+    y_test_t = torch.tensor(y_all[split_idx:], dtype=torch.float32).view(-1, 1)
 
     train_loader = DataLoader(
-        TensorDataset(X_train_t, y_train_t),
+        TensorDataset(x_train_t, y_train_t),
         batch_size=cfg["training"]["batch_size"],
         shuffle=False,
     )
     test_loader = DataLoader(
-        TensorDataset(X_test_t, y_test_t),
+        TensorDataset(x_test_t, y_test_t),
         batch_size=cfg["training"]["batch_size"],
         shuffle=False,
     )
@@ -160,11 +163,11 @@ def train_and_log() -> str | None:
         mlflow.set_tag("model_name", "LSTM_Petrobras")
         mlflow.set_tag("model_version", "2.0.0")
         mlflow.set_tag("model_type", "regression_time_series")
-        mlflow.set_tag("training_data_version", "DVC_DATA_v2")  # Idealmente viria de comando dvc
+        mlflow.set_tag("training_data_version", "DVC_DATA_v2")
         mlflow.set_tag("owner", "grupo-XX@datathon.com")
         mlflow.set_tag("risk_level", "medium")
         mlflow.set_tag("fairness_checked", "true")
-        mlflow.set_tag("git_sha", "HEAD")  # Idealmente via git rev-parse
+        mlflow.set_tag("git_sha", "HEAD")
 
         # 2. Logs de Hiperparâmetros
         mlflow.log_params(cfg["model"])
@@ -184,29 +187,32 @@ def train_and_log() -> str | None:
 
             if (epoch + 1) % 10 == 0 or epoch == 0:
                 logger.info(
-                    f"Época [{epoch + 1}/{num_epochs}] | Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}"
+                    f"Época [{epoch + 1}/{num_epochs}] | "
+                    f"Train Loss: {train_loss:.5f} | Val Loss: {val_loss:.5f}"
                 )
 
         # --- AVALIAÇÃO FINAL (ESCALA REAL E MÉTRICA DE NEGÓCIO) ---
         modelo.eval()
         with torch.no_grad():
-            previsoes_scaled = modelo(X_test_t.to(device)).cpu().numpy()
-            y_test_scaled = y_test_t.numpy()
+            previsoes_scaled = modelo(x_test_t.to(device)).cpu().numpy()
+            y_test_scaled_np = y_test_t.numpy()
 
             # Desnormalização Multivariada para Reais (R$)
-            # Criamos um dummy array para reverter o scaler apenas na coluna Close (index 0)
-            def inverse_transform_target(scaled_val: np.ndarray, scaler_obj: Any) -> np.ndarray:
+            def inverse_transform_target(
+                scaled_val: np.ndarray,
+                scaler_obj: Any,  # noqa: ANN401
+            ) -> np.ndarray:
                 dummy = np.zeros((len(scaled_val), cfg["model"]["input_size"]))
                 dummy[:, 0] = scaled_val.flatten()
                 return scaler_obj.inverse_transform(dummy)[:, 0].reshape(-1, 1)
 
             previsoes_real = inverse_transform_target(previsoes_scaled, scaler)
-            y_test_real = inverse_transform_target(y_test_scaled, scaler)
+            y_test_real = inverse_transform_target(y_test_scaled_np, scaler)
 
             # Métricas Tradicionais
             mse_real = float(mean_squared_error(y_test_real, previsoes_real))
-            mae_real = float(mean_absolute_error(y_test_real, previsoes_real))
             rmse_real = float(np.sqrt(mse_real))
+            mae_real = float(mean_absolute_error(y_test_real, previsoes_real))
 
             # Métricas de Negócio (O grande diferencial)
             sigma_metrics = compute_sigma_metric(
@@ -235,7 +241,8 @@ def train_and_log() -> str | None:
 
         logger.info(
             f"Treino Finalizado! RMSE: {rmse_real:.2f} | "
-            f"Taxa de Acerto (< {cfg['business_metric']['tolerance']}σ): {sigma_metrics['pct_within_tolerance']:.1f}%"
+            f"Taxa de Acerto (< {cfg['business_metric']['tolerance']} sigma): "
+            f"{sigma_metrics['pct_within_tolerance']:.1f}%"
         )
         return run.info.run_id
 

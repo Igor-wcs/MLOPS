@@ -21,7 +21,7 @@ class TestPredictEndpoint:
     """Testes do endpoint de inferência (Série Temporal LSTM)."""
 
     def test_predict_invalid_payload(self, client: TestClient) -> None:
-        """Payload com chaves incorretas deve retornar erro de parâmetros (400 via handler customizado)."""
+        """Payload com chaves incorretas deve retornar erro de parâmetros (400)."""
         # A API espera {"ticker": "PETR4.SA"}, não "acao"
         response = client.post("/predict", json={"acao": "PETR4.SA"})
         # Como removemos o default, o ticker é obrigatório.

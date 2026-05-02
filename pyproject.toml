@@ -107,12 +107,19 @@ ignore = [
     "N806",    # Variable X in function should be lowercase (idiomatic in ML)
 ]
 
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "ANN", "D"]
 "demo_day.py" = ["T201", "S101", "PLR0915", "D"]
 "dags/*" = ["PLC0415", "T201", "E402"]
 "src/models/*" = ["N806"]
 "evaluation/*" = ["T201", "ANN", "D"]
+"notebooks/*" = ["ANN", "D", "N816", "E501", "T201"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -140,8 +147,3 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
 ]
-
-[tool.black]
-line-length = 100
-target-version = ['py311']
-include = '\.pyi?$'

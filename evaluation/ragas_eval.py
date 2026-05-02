@@ -1,175 +1,126 @@
 import json
 import logging
-from pathlib import Path
+import os
 
-import pandas as pd
+import mlflow
 import yaml
 from datasets import Dataset
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from dotenv import load_dotenv
 from ragas import evaluate
-from ragas.embeddings import LangchainEmbeddingsWrapper
-from ragas.llms import LangchainLLMWrapper
-from ragas.metrics import (
-    answer_relevancy,
-    context_precision,
-    context_recall,
-    faithfulness,
-)
+from ragas.metrics import faithfulness, reresponse_relevancy
 
+# Importações do nosso ecossistema
+from src.agent.rag_pipeline import RAGPipeline
+from src.agent.react_agent import create_datathon_agent, query_agent
+from src.agent.tools import get_stock_tools
+
+# Configuração de Logs
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+load_dotenv()
 
-def load_config():
+
+def load_config() -> dict:
+    """Carrega as configurações do projeto."""
     with open("configs/model_config.yaml", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
-def load_golden_set(path: str = "data/golden_set/golden_set.json") -> list[dict]:
-    if not Path(path).exists():
-        raise FileNotFoundError(
-            f"Golden set não encontrado em {path}. Crie o arquivo com 20 pares."
-        )
-
-    with open(path, encoding="utf-8") as f:
-        golden_set = json.load(f)
-    logger.info("Golden set carregado: %d pares", len(golden_set))
-    return golden_set
-
-
-def generate_rag_responses(golden_set: list[dict]) -> list[dict]:
+def get_agent_response(question: str) -> dict:
     """Gera respostas dinâmicas passando pelo Agente Qwen e RAG local."""
-    # Importações do nosso ecossistema
-    from src.agent.react_agent import create_datathon_agent, query_agent
-    from src.agent.tools import get_stock_tools
-
-    # Importação do RAG (que vamos construir a seguir)
     try:
-        from src.agent.rag_pipeline import RAGPipeline
-
         rag = RAGPipeline()
-    except ImportError:
-        logger.warning("RAGPipeline não encontrado. Simulando recuperação para fins de teste.")
-        rag = None
+        tools = get_stock_tools()
+        agent = create_datathon_agent(tools)
 
-    results = []
+        result = query_agent(agent, question)
+        answer = result.get("answer", "")
 
-    # Instancia o Agente uma única vez para não recarregar o modelo na memória
-    tools = get_stock_tools()
-    agent = create_datathon_agent(tools)
+        # Recupera contextos usados para o RAGAS validar
+        contexts = [doc.page_content for doc in rag.retrieve(question)]
 
-    for item in golden_set:
-        query = item["question"]  # Usando "question" conforme padrão RAGAS
-
-        # 1. Recuperar contextos
-        if rag:
-            docs = rag.retrieve(query, top_k=3)
-            contexts = [doc.page_content for doc in docs]
-        else:
-            contexts = item.get(
-                "contexts", ["Contexto simulado pois RAGPipeline ainda não existe."]
-            )
-
-        # 2. Gerar resposta via Agente
-        try:
-            response = query_agent(agent, query)
-            answer = response["answer"]
-        except Exception as e:
-            logger.error(f"Erro ao gerar resposta para '{query[:50]}': {e}")
-            answer = "Erro ao processar a pergunta."
-
-        results.append(
-            {
-                "question": query,
-                "answer": answer,
-                "contexts": contexts,
-                "ground_truth": item.get(
-                    "ground_truth", item.get("expected_answer")
-                ),  # Suporta tanto "ground_truth" quanto "expected_answer"
-            }
-        )
-        logger.info(f"Processado: {query[:50]}...")
-
-    return results
+        return {"answer": answer, "contexts": contexts}
+    except Exception as e:
+        logger.error(f"Erro ao gerar resposta para RAGAS: {e}")
+        return {"answer": "Erro", "contexts": []}
 
 
-def evaluate_rag_pipeline(
-    golden_set_path: str = "data/golden_set/golden_set.json",
-) -> dict[str, float]:
-    """Avalia o pipeline com RAGAS e salva auditoria no MLflow."""
+def run_ragas_evaluation() -> None:
+    """Executa o framework RAGAS para medir Fidelidade e Relevância do Agente."""
     cfg = load_config()
+    logger.info("\n--- INICIANDO AVALIAÇÃO RAGAS (MÉTRICAS LLM) ---")
 
-    logger.info("Iniciando geração de respostas do Agente...")
-    golden_set = load_golden_set(golden_set_path)
-    results = generate_rag_responses(golden_set)
+    # 1. Carregamento do Golden Set (Gabarito)
+    try:
+        with open("data/golden_set/golden_set.json", encoding="utf-8") as f:
+            golden_data = json.load(f)
+    except FileNotFoundError:
+        logger.error("Golden Set não encontrado.")
+        return
 
-    dataset = Dataset.from_list(results)
-
-    # Inicializa o LLM-Juiz (Requer OPENAI_API_KEY no .env)
-    logger.info("Inicializando LLM Juiz (OpenAI) para avaliação sintética...")
-    import os
-
-    if not os.environ.get("OPENAI_API_KEY"):
-        logger.warning(
-            "OPENAI_API_KEY não encontrada. Salvando relatório vazio para completar o pipeline."
-        )
-        metrics = {
-            "ragas_faithfulness": 0.0,
-            "ragas_answer_relevancy": 0.0,
-            "ragas_context_precision": 0.0,
-            "ragas_context_recall": 0.0,
-        }
-        pd.DataFrame([metrics]).to_csv("ragas_detailed_report.csv", index=False)
-        return metrics
-
-    eval_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o-mini", temperature=0))
-    eval_embeddings = LangchainEmbeddingsWrapper(OpenAIEmbeddings(model="text-embedding-3-small"))
-
-    # Avaliação RAGAS — As 4 métricas obrigatórias da banca
-    scores = evaluate(
-        dataset,
-        metrics=[
-            faithfulness,
-            answer_relevancy,
-            context_precision,
-            context_recall,
-        ],
-        llm=eval_llm,
-        embeddings=eval_embeddings,
-        raise_exceptions=False,
-    )
-
-    # Processamento de Métricas
-    df_results = scores.to_pandas()
-    metrics = {
-        "ragas_faithfulness": float(df_results["faithfulness"].mean(skipna=True)),
-        "ragas_answer_relevancy": float(df_results["answer_relevancy"].mean(skipna=True)),
-        "ragas_context_precision": float(df_results["context_precision"].mean(skipna=True)),
-        "ragas_context_recall": float(df_results["context_recall"].mean(skipna=True)),
+    # 2. Coleta de Respostas do Agente em Tempo Real
+    logger.info(f"Processando {len(golden_data)} perguntas pelo Agente local...")
+    dataset_dict = {
+        "question": [],
+        "answer": [],
+        "contexts": [],
+        "ground_truth": [],
     }
 
-    # ==========================================
-    # LOG NO MLFLOW E ARTEFATOS
-    # ==========================================
+    for item in golden_data:
+        question = item["question"]
+        logger.info(f"Agente respondendo: {question[:60]}...")
+
+        res = get_agent_response(question)
+
+        dataset_dict["question"].append(question)
+        dataset_dict["answer"].append(res["answer"])
+        dataset_dict["contexts"].append(res["contexts"])
+        dataset_dict["ground_truth"].append(item["ground_truth"])
+
+    # 3. Conversão para Dataset HuggingFace (Exigido pelo RAGAS)
+    dataset = Dataset.from_dict(dataset_dict)
+
+    # 4. Execução da Avaliação
+    # Inicializa o LLM-Juiz (Requer OPENAI_API_KEY no .env)
+    logger.info("Inicializando LLM Juiz (OpenAI) para avaliação sintética...")
+
+    if not os.environ.get("OPENAI_API_KEY"):
+        logger.error("Erro: OPENAI_API_KEY necessária para rodar RAGAS.")
+        return
+
+    # RAGAS Metrics
+    # Faithfulness: A resposta é baseada apenas no contexto? (Evita Alucinação)
+    # Relevancy: A resposta foca no que foi perguntado?
+    metrics = [faithfulness, reresponse_relevancy]
+
+    logger.info("Calculando métricas RAGAS... (Isso pode levar alguns minutos)")
+    result = evaluate(
+        dataset,
+        metrics=metrics,
+    )
+
+    # 5. Exportação de Resultados
+    logger.info("\n" + "=" * 40)
+    logger.info("RESULTADOS RAGAS (0.0 a 1.0):")
+    for metric_name, value in result.items():
+        logger.info(f"- {metric_name:20}: {value:.4f}")
+    logger.info("=" * 40)
+
+    # Log no MLflow
     try:
-        import mlflow
-
         mlflow.set_experiment(cfg["paths"]["experiment_name"])
-
-        with mlflow.start_run(run_name="Avaliacao_RAGAS_Agente"):
-            mlflow.set_tag("phase", "datathon-fase05")
-            mlflow.log_metrics(metrics)
-
-            # Salvar CSV de auditoria (A banca adora ver isso)
-            report_path = "ragas_detailed_report.csv"
-            df_results.to_csv(report_path, index=False)
-            mlflow.log_artifact(report_path)
-            logger.info("Métricas e CSV de auditoria salvos no MLflow.")
-
+        with mlflow.start_run(run_name="RAGAS_Evaluation"):
+            mlflow.log_metrics(result)
+            # Salva o dataframe detalhado como artefato
+            df_detailed = result.to_pandas()
+            df_detailed.to_csv("ragas_detailed_report.csv", index=False)
+            mlflow.log_artifact("ragas_detailed_report.csv")
+            logger.info("Métricas RAGAS enviadas ao MLflow com sucesso.")
     except Exception as e:
-        logger.warning(f"Aviso: Não foi possível logar no MLflow: {e}")
-
-    return metrics
+        logger.warning(f"Erro ao logar no MLflow: {e}")
 
 
 if __name__ == "__main__":
-    evaluate_rag_pipeline()
+    run_ragas_evaluation()

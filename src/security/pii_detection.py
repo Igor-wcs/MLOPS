@@ -1,6 +1,7 @@
 """Sistema de detecção e Anonimização de dados sensíveis PII.
 
-Especializado para dados brasileiros (CPF, telefone BR). Conformidade com a LGPDM e Mitigação OWASP LLM06.
+Especializado para dados brasileiros (CPF, telefone BR).
+Conformidade com a LGPDM e Mitigação OWASP LLM06.
 """
 
 import logging

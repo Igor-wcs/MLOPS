@@ -9,6 +9,7 @@ Este script automatiza a validação de todos os requisitos da banca:
 import logging
 import os
 import subprocess
+import sys
 import time
 import webbrowser
 
@@ -39,7 +40,8 @@ def run_demo() -> None:
             print(f"✅ API Online: {res.json()}")
         else:
             print(
-                "❌ API Offline. Certifique-se de rodar 'uvicorn src.serving.app:app' em outro terminal."
+                "❌ API Offline. Certifique-se de rodar 'uvicorn src.serving.app:app' "
+                "em outro terminal."
             )
             return
     except Exception:
@@ -90,7 +92,10 @@ def run_demo() -> None:
     log_header("ETAPA 5: MATURIDADE MLOPS & ENGENHARIA")
 
     print("\n[1/3] Verificando Cobertura de Testes (Meta > 60%)...")
-    subprocess.run("python -m pytest tests --cov=src --cov-report=term-missing", shell=True)
+    subprocess.run(
+        [sys.executable, "-m", "pytest", "tests", "--cov=src", "--cov-report=term-missing"],
+        check=False,
+    )
 
     print("\n[2/3] Abrindo Relatório de Drift (Evidently)...")
     caminho_drift = os.path.abspath("drift_report.html")
@@ -99,7 +104,8 @@ def run_demo() -> None:
         webbrowser.open(f"file://{caminho_drift}")
     else:
         print(
-            "Aviso: Relatório de drift não encontrado. Rode 'python -m src.monitoring.drift' primeiro."
+            "Aviso: Relatório de drift não encontrado. "
+            "Rode 'python -m src.monitoring.drift' primeiro."
         )
 
     # 6. Painel de Controle de Links (Links MLOps)

@@ -28,23 +28,26 @@ LLM_FAITHFULNESS = Gauge("agent_llm_faithfulness", "Métrica de fidelidade da re
 LLM_RELEVANCY = Gauge("agent_llm_relevancy", "Métrica de relevância da resposta à pergunta")
 
 
-def start_metrics_server(port: int = 9090):
+def start_metrics_server(port: int = 9090) -> None:
     """Inicia o servidor de métricas do Prometheus."""
     logger.info(f"Iniciando exportador Prometheus na porta {port}...")
     start_http_server(port)
 
 
 # Exemplo de uso para integração posterior no app.py
-def track_prediction(sigma_val: float):
+def track_prediction(sigma_val: float) -> None:
+    """Registra o erro sigma da predição atual."""
     SIGMA_ERROR.set(sigma_val)
 
 
-def track_drift(share: float):
+def track_drift(share: float) -> None:
+    """Registra a proporção de drift detectada."""
     DRIFT_SHARE.set(share)
 
 
 @LATENCY.time()
-def process_request(success: bool = True):
+def process_request(success: bool = True) -> None:
+    """Incrementa o contador de requisições processadas."""
     status = "success" if success else "error"
     REQUEST_COUNT.labels(status=status).inc()
 

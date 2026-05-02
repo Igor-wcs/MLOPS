@@ -23,7 +23,7 @@ Pergunta: {input}
 Ferramenta:"""
 
 # Prompt focado apenas em FORMATAR a resposta final
-FINAL_PROMPT = """Você é um assistente financeiro. 
+FINAL_PROMPT = """Você é um assistente financeiro.
 Use a Informação abaixo para responder à Pergunta de forma curta.
 AVISO: Esta análise não constitui recomendação de investimento.
 
@@ -32,7 +32,8 @@ Informação: {observation}
 Resposta Final:"""
 
 
-def load_config():
+def load_config() -> dict[str, Any]:
+    """Carrega as configurações do sistema a partir do arquivo YAML."""
     with open("configs/model_config.yaml", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
@@ -40,17 +41,19 @@ def load_config():
 class RouterAgent:
     """Versão enxuta para hardware limitado."""
 
-    def __init__(self, tools: list[Tool]):
+    def __init__(self, tools: list[Tool]) -> None:
         self.cfg = load_config()
         self.ticker = self.cfg["data"]["ticker"]
         self.tools = {t.name: t for t in tools}
         self.llm = self._init_llm()
 
-    def _init_llm(self):
+    def _init_llm(self) -> HuggingFacePipeline:
+        """Inicializa o modelo de linguagem local."""
         llm_cfg = self.cfg["llm"]
         temp = llm_cfg.get("temperature", 0.1)
 
-        # Correção da lógica de amostragem: se temp for 0, desativa do_sample para ser determinístico
+        # Correção da lógica de amostragem:
+        # se temp for 0, desativa do_sample para ser determinístico
         do_sample = True if temp > 0 else False
 
         return HuggingFacePipeline.from_model_id(
@@ -65,6 +68,7 @@ class RouterAgent:
         )
 
     def run(self, input_text: str) -> dict[str, Any]:
+        """Executa a lógica de roteamento e resposta do agente."""
         # 1. Roteamento (Lógica Híbrida: LLM + Keywords para robustez em SLM)
         query_lower = input_text.lower()
 
@@ -108,11 +112,13 @@ class RouterAgent:
 
 
 # Mantendo compatibilidade com scripts existentes
-def create_datathon_agent(tools: list[Tool]):
+def create_datathon_agent(tools: list[Tool]) -> RouterAgent:
+    """Cria e retorna uma instância do RouterAgent."""
     return RouterAgent(tools)
 
 
-def query_agent(agent: RouterAgent, question: str):
+def query_agent(agent: RouterAgent, question: str) -> dict[str, Any]:
+    """Consulta o agente e formata a resposta para compatibilidade."""
     res = agent.run(question)
     return {
         "answer": res["answer"],

@@ -24,6 +24,7 @@ def preparar_janelas_temporais(
     dados: np.ndarray, window_size: int = 30, train_ratio: float = 0.8
 ) -> tuple[np.ndarray, np.ndarray, Any]:
     """Escalona e prepara janelas temporais para treinamento do modelo LSTM multivariado.
+
     O target é assumido como a primeira coluna do array 'dados'.
 
     Args:
@@ -34,7 +35,7 @@ def preparar_janelas_temporais(
     Returns:
         Tupla (X, y, scaler).
     """
-    n_features = dados.shape[1]
+    dados.shape[1]
     tamanho_x_esperado = len(dados) - window_size
     split_idx = int(tamanho_x_esperado * train_ratio) + window_size
 
@@ -55,7 +56,7 @@ def preparar_janelas_temporais(
     return X_arr, y_arr, scaler
 
 
-def run_feature_engineering():
+def run_feature_engineering() -> None:
     """Pipeline de processamento de features para DVC."""
     cfg = load_config()
 
