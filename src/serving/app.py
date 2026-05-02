@@ -68,7 +68,7 @@ agent_executor = None # Singleton para o Agente
 
 
 class PredictRequest(BaseModel):
-    ticker: str = "PETR4.SA"
+    ticker: str
 
 
 class AgentRequest(BaseModel):

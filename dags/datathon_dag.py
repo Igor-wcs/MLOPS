@@ -2,8 +2,13 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import ShortCircuitOperator, PythonOperator
 from datetime import datetime, timedelta
+import logging
 import os
 import sys
+
+# Configuração de Logs
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 # Adiciona o diretório raiz ao path para que os módulos src sejam encontrados
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -26,8 +31,8 @@ def check_drift_and_decide() -> bool:
     
     threshold = mon_cfg["drift"]["retrain_threshold"]
     
-    print(f"--- [DRIFT CHECK] ---")
-    print(f"Drift Detectado: {drift_share:.4f} | Limite para Retreino: {threshold:.4f}")
+    logger.info("--- [DRIFT CHECK] ---")
+    logger.info(f"Drift Detectado: {drift_share:.4f} | Limite para Retreino: {threshold:.4f}")
     
     # 3. Retorna True se o drift for maior que o threshold
     return drift_share > threshold
@@ -52,7 +57,7 @@ def validate_champion_challenger():
     try:
         versions = client.search_model_versions(f"name='{model_name}'")
         if len(versions) < 2:
-            print("Apenas uma versão disponível. Promoção automática para Champion.")
+            logger.info("Apenas uma versão disponível. Promoção automática para Champion.")
             return True
             
         # Ordena por versão para pegar as duas mais recentes
@@ -67,21 +72,21 @@ def validate_champion_challenger():
         rmse_challenger = run_challenger.data.metrics.get("rmse_real", 999999)
         rmse_champion = run_champion.data.metrics.get("rmse_real", 999999)
         
-        print(f"--- [CHAMPION vs CHALLENGER] ---")
-        print(f"Challenger (v{challenger.version}) RMSE: {rmse_challenger:.4f}")
-        print(f"Champion (v{champion.version}) RMSE: {rmse_champion:.4f}")
+        logger.info(f"--- [CHAMPION vs CHALLENGER] ---")
+        logger.info(f"Challenger (v{challenger.version}) RMSE: {rmse_challenger:.4f}")
+        logger.info(f"Champion (v{champion.version}) RMSE: {rmse_champion:.4f}")
         
         # 3. Critério de Aceite: O erro deve ser menor ou igual ao anterior
         if rmse_challenger <= rmse_champion:
-            print("✅ APROVADO: O novo modelo é superior ou igual. Promoção permitida.")
+            logger.info("✅ APROVADO: O novo modelo é superior ou igual. Promoção permitida.")
             # Aqui poderíamos adicionar a lógica de transição de stage no MLflow
             return True
         else:
-            print("❌ REPROVADO: O novo modelo degradou a performance. Mantendo Champion atual.")
+            logger.info("❌ REPROVADO: O novo modelo degradou a performance. Mantendo Champion atual.")
             return False
             
     except Exception as e:
-        print(f"Erro na validação: {e}")
+        logger.error(f"Erro na validação: {e}")
         return False
 
 # Configurações padrão

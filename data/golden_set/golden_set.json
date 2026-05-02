@@ -13,5 +13,90 @@
     "question": "Quando é o próximo pagamento de dividendos da Petrobras?",
     "ground_truth": "O próximo pagamento terá como 'data com' o dia 15 de maio de 2026, no valor de R$ 1,05 por ação.",
     "contexts": ["PETR4: Data com para dividendos ordinários de R$ 1,05 por ação é 2026-05-15."]
+  },
+  {
+    "question": "Qual a política de investimentos da Datathon S.A.?",
+    "ground_truth": "A empresa segue regras rígidas de compliance e não faz recomendações de compra ou venda.",
+    "contexts": ["Políticas: Regras rígidas de compliance. Não fazemos recomendações de compra ou venda."]
+  },
+  {
+    "question": "Como os dividendos são pagos na Datathon S.A.?",
+    "ground_truth": "São pagos trimestralmente, seguindo a política de 25% do lucro líquido.",
+    "contexts": ["Dividendos: Pagos trimestralmente, 25% do lucro líquido."]
+  },
+  {
+    "question": "Para que serve o modelo LSTM da empresa?",
+    "ground_truth": "É usado apenas para fins educacionais e estudo de séries temporais.",
+    "contexts": ["LSTM: Fins educacionais e estudo de séries temporais."]
+  },
+  {
+    "question": "A Petrobras (PETR4) teve qual volume no dia 24 de abril de 2026?",
+    "ground_truth": "O volume foi de 65 milhões.",
+    "contexts": ["PETR4: volume=65M no dia 2026-04-24."]
+  },
+  {
+    "question": "Qual a meta de distribuição de lucro para dividendos?",
+    "ground_truth": "A meta é distribuir 25% do lucro líquido.",
+    "contexts": ["Política: 25% do lucro líquido para dividendos."]
+  },
+  {
+    "question": "O sistema faz recomendações de investimento?",
+    "ground_truth": "Não, o sistema não constitui recomendação de investimento.",
+    "contexts": ["Compliance: Não fazemos recomendações de compra ou venda."]
+  },
+  {
+    "question": "Qual a janela de observação usada pelo modelo?",
+    "ground_truth": "O modelo utiliza uma janela de 30 dias passados.",
+    "contexts": ["Config: window_size=30 dias passados."]
+  },
+  {
+    "question": "Quem é o responsável pelos modelos?",
+    "ground_truth": "O responsável é o grupo-XX.",
+    "contexts": ["Tags: owner=grupo-XX."]
+  },
+  {
+    "question": "Qual o framework usado para o modelo LSTM?",
+    "ground_truth": "O framework utilizado é o PyTorch.",
+    "contexts": ["Tags: framework=pytorch."]
+  },
+  {
+    "question": "O sistema detecta PII?",
+    "ground_truth": "Sim, o sistema possui detecção de PII via Presidio.",
+    "contexts": ["Security: PII detection enabled via Presidio."]
+  },
+  {
+    "question": "Qual a temperatura configurada para o LLM?",
+    "ground_truth": "A temperatura é de 0.1.",
+    "contexts": ["Config: llm temperature=0.1."]
+  },
+  {
+    "question": "Onde ficam armazenados os logs de drift?",
+    "ground_trace": "Os logs de drift ficam no MLflow e em drift_report.html.",
+    "contexts": ["Monitoring: drift_report.html e artifacts no MLflow."]
+  },
+  {
+    "question": "Qual o ticker padrão do sistema?",
+    "ground_truth": "O ticker padrão é PETR4.SA.",
+    "contexts": ["Config: ticker=PETR4.SA."]
+  },
+  {
+    "question": "O sistema usa qual banco de vetores?",
+    "ground_truth": "O sistema utiliza o ChromaDB.",
+    "contexts": ["RAG: vector_db_path=data/chroma_db."]
+  },
+  {
+    "question": "Qual o modelo de embeddings utilizado?",
+    "ground_truth": "O modelo é o sentence-transformers/all-MiniLM-L6-v2.",
+    "contexts": ["RAG: embedding_model=sentence-transformers/all-MiniLM-L6-v2."]
+  },
+  {
+    "question": "Como o drift é calculado?",
+    "ground_truth": "O drift é calculado usando Evidently com DataDriftPreset e TargetDriftPreset.",
+    "contexts": ["Drift: Evidently DataDriftPreset e TargetDriftPreset."]
+  },
+  {
+    "question": "Qual o threshold de retreino por drift?",
+    "ground_truth": "O threshold é de 0.2 (20%).",
+    "contexts": ["Monitoring: retrain_threshold=0.2."]
   }
 ]

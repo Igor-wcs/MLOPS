@@ -1,0 +1,15 @@
+artifact_uri: /opt/airflow/mlruns/799783254622877324/b7935107d3544c83810c05caa278e98a/artifacts
+end_time: 1777751666906
+entry_point_name: ''
+experiment_id: '799783254622877324'
+lifecycle_stage: active
+run_id: b7935107d3544c83810c05caa278e98a
+run_name: Treino_PETR4.SA
+run_uuid: b7935107d3544c83810c05caa278e98a
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1777751640930
+status: 3
+tags: []
+user_id: igor_

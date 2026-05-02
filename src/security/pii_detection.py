@@ -7,6 +7,7 @@ import logging
 from functools import lru_cache
 
 from presidio_analyzer import AnalyzerEngine, PatternRecognizer, Pattern
+from presidio_analyzer.nlp_engine import NlpEngineProvider
 from presidio_anonymizer import AnonymizerEngine
 
 logger = logging.getLogger(__name__)
@@ -16,9 +17,16 @@ logger = logging.getLogger(__name__)
 def get_br_analyzer() -> AnalyzerEngine:
     """
     Cria e faz o cache do analisador com reconhecedores brasileiros.
-    O lru_cache garante que o motor do Presidio seja instanciado apenas uma vez.
     """
-    analyzer = AnalyzerEngine()
+    # Configuração explícita do motor NLP para Português
+    configuration = {
+        "nlp_engine_name": "spacy",
+        "models": [{"lang_code": "pt", "model_name": "pt_core_news_lg"}],
+    }
+    provider = NlpEngineProvider(nlp_configuration=configuration)
+    nlp_engine = provider.create_engine()
+
+    analyzer = AnalyzerEngine(nlp_engine=nlp_engine, default_score_threshold=0.4)
 
     # Reconhecedor de CPF Brasileiro
     cpf_pattern = Pattern(

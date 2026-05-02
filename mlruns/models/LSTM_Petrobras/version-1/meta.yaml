@@ -1,0 +1,14 @@
+aliases: []
+creation_timestamp: 1777749879162
+current_stage: None
+description: ''
+last_updated_timestamp: 1777749879162
+name: LSTM_Petrobras
+run_id: 3f430fe41fa04993b224b6343d34055b
+run_link: ''
+source: /opt/airflow/mlruns/799783254622877324/3f430fe41fa04993b224b6343d34055b/artifacts/model
+status: READY
+status_message: null
+storage_location: /opt/airflow/mlruns/799783254622877324/3f430fe41fa04993b224b6343d34055b/artifacts/model
+user_id: null
+version: 1

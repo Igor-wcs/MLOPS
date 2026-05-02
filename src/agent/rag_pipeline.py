@@ -141,6 +141,6 @@ class RAGPipeline:
 if __name__ == "__main__":
     # Script auxiliar rodado diretamente no terminal para popular o banco
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-    print("--- Ingestão de Documentos (RAG) ---")
+    logger.info("--- Ingestão de Documentos (RAG) ---")
     pipeline = RAGPipeline()
     pipeline.ingest_directory()

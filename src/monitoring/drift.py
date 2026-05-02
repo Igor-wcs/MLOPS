@@ -83,9 +83,8 @@ def gerar_relatorio_drift() -> float:
         df_yf = df_yf[["Close", "Open", "High", "Low", "Volume", "EMA20"]].dropna()
         dados_input = df_yf.values
     except Exception as e:
-        logger.warning(f"Falha na coleta de dados: {e}. Abortando drift ou usando fallback.")
-        # Se for um erro crítico, retornamos 0 para não disparar retreino falso
-        if "insuficientes" in str(e): return 0.0
+        logger.warning(f"Falha na coleta de dados: {e}. Usando fallback de dados sintéticos.")
+        # Fallback de dados sintéticos (Mock)
         dados_input = np.random.randn(200, 6)
 
     # 3. Preparação das janelas temporais

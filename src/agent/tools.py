@@ -17,19 +17,31 @@ from src.agent.rag_pipeline import RAGPipeline
 logger = logging.getLogger(__name__)
 
 
-def load_config():
+def load_config() -> dict:
+    """
+    Carrega o arquivo de configuração YAML centralizado.
+    Returns:
+        Dicionário com as configurações do modelo e do pipeline.
+    """
     with open("configs/model_config.yaml", "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 # Singleton para o RAG para evitar recarregar embeddings em cada chamada
-_rag_pipeline_instance = None
+_rag_pipeline_instance: Optional[RAGPipeline] = None
+
 
 def get_project_root() -> Path:
     """Retorna o caminho raiz do projeto de forma robusta."""
     return Path(__file__).parent.parent.parent
 
-def get_rag_pipeline():
+
+def get_rag_pipeline() -> RAGPipeline:
+    """
+    Retorna a instância singleton do pipeline RAG.
+    Returns:
+        Objeto RAGPipeline inicializado.
+    """
     global _rag_pipeline_instance
     if _rag_pipeline_instance is None:
         _rag_pipeline_instance = RAGPipeline()

@@ -20,10 +20,13 @@ class TestPredictEndpoint:
     """Testes do endpoint de inferência (Série Temporal LSTM)."""
 
     def test_predict_invalid_payload(self, client: TestClient) -> None:
-        """Payload com chaves incorretas deve retornar erro do Pydantic (422)."""
+        """Payload com chaves incorretas deve retornar erro de parâmetros (400 via handler customizado)."""
         # A API espera {"ticker": "PETR4.SA"}, não "acao"
         response = client.post("/predict", json={"acao": "PETR4.SA"})
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        # Como removemos o default, o ticker é obrigatório. 
+        # O exception handler customizado em app.py converte 422 em 400.
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Parâmetros inválidos" in response.json()["message"]
 
     def test_predict_unloaded_model(self, client: TestClient) -> None:
         """Testa o comportamento caso os artefatos (Redis/Modelo) falhem no startup."""
@@ -50,7 +53,9 @@ class TestAgentEndpoint:
     def test_agent_invalid_schema(self, client: TestClient) -> None:
         """Validação de contrato (Pydantic). O schema correto é 'query'."""
         response = client.post("/agent", json={"pergunta": "Qual o valor de PETR4?"})
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        # O exception handler customizado em app.py converte 422 em 400.
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "Parâmetros inválidos" in response.json()["message"]
 
     def test_agent_injection_blocked(self, client: TestClient) -> None:
         """Garante a integração da rota com o InputGuardrail (OWASP LLM01)."""

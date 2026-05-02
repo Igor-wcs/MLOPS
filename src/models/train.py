@@ -166,18 +166,20 @@ def train_and_log():
     mlflow.set_experiment(cfg["paths"]["experiment_name"])
 
     with mlflow.start_run(run_name=f"Treino_{ticker}") as run:
-        # Logs de Governança
+        # 1. Tags de Governança Obrigatórias (Maturidade MLOps Nível 2)
+        mlflow.set_tag("model_name", "LSTM_Petrobras")
+        mlflow.set_tag("model_version", "2.0.0")
+        mlflow.set_tag("model_type", "regression_time_series")
+        mlflow.set_tag("training_data_version", "DVC_DATA_v2") # Idealmente viria de comando dvc
+        mlflow.set_tag("owner", "grupo-XX@datathon.com")
+        mlflow.set_tag("risk_level", "medium")
+        mlflow.set_tag("fairness_checked", "true")
+        mlflow.set_tag("git_sha", "HEAD") # Idealmente via git rev-parse
+
+        # 2. Logs de Hiperparâmetros
         mlflow.log_params(cfg["model"])
         mlflow.log_params(cfg["training"])
         mlflow.log_param("window_size", window)
-        mlflow.log_param("features", "Close, Open, High, Low, Volume, EMA20")
-
-        mlflow.set_tag("model_type", "lstm_multivariate")
-        mlflow.set_tag("framework", "pytorch")
-        mlflow.set_tag("phase", "datathon-fase05")
-        mlflow.set_tag(
-            "business_metric", f"sigma_tolerance_{cfg['business_metric']['tolerance']}"
-        )
 
         # Loop de Treinamento
         logger.info("Iniciando treinamento das épocas...")

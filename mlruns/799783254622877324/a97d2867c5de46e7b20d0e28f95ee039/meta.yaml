@@ -1,0 +1,15 @@
+artifact_uri: /opt/airflow/mlruns/799783254622877324/a97d2867c5de46e7b20d0e28f95ee039/artifacts
+end_time: 1777751970484
+entry_point_name: ''
+experiment_id: '799783254622877324'
+lifecycle_stage: active
+run_id: a97d2867c5de46e7b20d0e28f95ee039
+run_name: Monitoring_Drift_Evidently
+run_uuid: a97d2867c5de46e7b20d0e28f95ee039
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1777751969543
+status: 4
+tags: []
+user_id: igor_

@@ -66,31 +66,43 @@ class RouterAgent:
         )
 
     def run(self, input_text: str) -> Dict[str, Any]:
-        # 1. Roteamento
-        route_query = ROUTER_PROMPT.format(input=input_text)
-        tool_name = self.llm.invoke(route_query).strip().lower()
-
-        # Seleção segura
-        selected = "consultar_base_conhecimento"
-        for name in self.tools.keys():
-            if name in tool_name:
-                selected = name
-                break
+        # 1. Roteamento (Lógica Híbrida: LLM + Keywords para robustez em SLM)
+        query_lower = input_text.lower()
+        
+        if any(w in query_lower for w in ["prev", "futuro", "amanhã", "modelo", "ia", "lstm"]):
+            selected = "obter_previsao_lstm"
+        elif any(w in query_lower for w in ["preço", "cotação", "valor", "hoje", "agora", "atual"]):
+            selected = "obter_cotacao_atual"
+        elif any(w in query_lower for w in ["política", "regra", "dividendos", "história", "sobre", "quem"]):
+            selected = "consultar_base_conhecimento"
+        else:
+            # Fallback para o LLM classificar
+            route_query = ROUTER_PROMPT.format(input=input_text)
+            tool_name = self.llm.invoke(route_query).strip().lower()
+            selected = "consultar_base_conhecimento"
+            for name in self.tools.keys():
+                if name in tool_name:
+                    selected = name
+                    break
 
         # 2. Execução
         tool = self.tools[selected]
-        obs = tool.run(
-            self.ticker if selected != "consultar_base_conhecimento" else input_text
-        )
+        # Se for RAG, passa a pergunta toda. Se for Ticker, usa o padrão.
+        arg = input_text if selected == "consultar_base_conhecimento" else self.ticker
+        obs = tool.run(arg)
 
         # 3. Resposta Final
         final_query = FINAL_PROMPT.format(input=input_text, observation=obs)
-        answer = self.llm.invoke(final_query)
+        answer = self.llm.invoke(final_query).strip()
+        
+        # Limpeza de rastro de prompt (comum em modelos pequenos)
+        if "Resposta Final:" in answer:
+            answer = answer.split("Resposta Final:")[-1].strip()
 
         return {
             "answer": answer,
             "intermediate_steps": [
-                {"tool": selected, "input": input_text, "output": obs}
+                {"tool": selected, "input": arg, "output": obs}
             ],
         }
 
