@@ -21,7 +21,7 @@ model:
 # --- 3. Parâmetros de Treinamento ---
 training:
   learning_rate: 0.001
-  num_epochs: 5
+  num_epochs: 30
   batch_size: 32
   early_stopping_patience: 5
 

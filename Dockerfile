@@ -12,7 +12,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Instala dependências do sistema
+# 1. Instala dependências do sistema
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
@@ -20,16 +20,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Copia definições de pacotes
-COPY pyproject.toml README.md ./
-COPY src/serving/requirements.txt ./serving-requirements.txt
+# 2. Copia APENAS o requirements para a raiz do container (Otimização de Cache)
+COPY requirements.txt ./
 
-# Instala dependências (Usa o requirements.txt do serving para ser mais leve na API)
+# 3. Instala as dependências Python
 RUN pip install --upgrade pip && \
-    pip install -r serving-requirements.txt && \
+    pip install --no-cache-dir -r requirements.txt && \
     python -m spacy download en_core_web_sm
 
-# Copia o código fonte
+# 4. Agora copia o restante dos arquivos de configuração e metadados
+COPY pyproject.toml README.md ./
+
+# 5. Copia as pastas de código e recursos
 COPY src/ ./src/
 COPY configs/ ./configs/
 COPY data/ ./data/
@@ -37,6 +39,7 @@ COPY data/ ./data/
 # --- ESTÁGIO 2: API (Imagem Otimizada para Inferência) ---
 FROM base-image as api
 EXPOSE 8000
+# Comando de inicialização da API
 CMD ["uvicorn", "src.serving.app:app", "--host", "0.0.0.0", "--port", "8000"]
 
 # --- ESTÁGIO 3: AIRFLOW (Imagem para Orquestração) ---
@@ -51,11 +54,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 USER airflow
 WORKDIR /opt/airflow
 
-# Copia o código e dependências para o contexto do Airflow
+# Copia arquivos necessários para instalação do pacote local no Airflow
 COPY --chown=airflow:root pyproject.toml README.md ./
+# Nota: O Airflow aqui instala as dependências extras necessárias para orquestração
 RUN pip install --no-cache-dir . && \
     pip install --no-cache-dir mlflow dvc[s3] redis yfinance
 
+# Copia o código e DAGs para o contexto do Airflow
 COPY --chown=airflow:root src/ ./src/
 COPY --chown=airflow:root dags/ ./dags/
 COPY --chown=airflow:root configs/ ./configs/
