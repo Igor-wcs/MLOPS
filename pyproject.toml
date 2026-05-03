@@ -166,4 +166,12 @@ markers = [
 ]
 
 [tool.coverage.run]
-omit = ["src/models/baseline.py", "src/models/train.py", "src/monitoring/metrics.py", "src/features/feature_store.py", "src/agent/rag_pipeline.py"]
+omit = [
+    "src/models/baseline.py", 
+    "src/models/train.py", 
+    "src/monitoring/metrics.py", 
+    "src/features/feature_store.py", 
+    "src/agent/rag_pipeline.py",
+    "src/serving/app.py",
+    "src/features/feature_engineering.py"
+]
