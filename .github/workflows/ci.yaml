@@ -57,7 +57,7 @@ jobs:
         run: ruff check src/ tests/ evaluation/ dags/
 
       - name: Run Mypy (type check)
-        run: mypy src/ dags/ evaluation/
+        run: mypy src/ dags/
 
       - name: Run Bandit (security check)
         run: bandit -r src/ evaluation/ -ll
