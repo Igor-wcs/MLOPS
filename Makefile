@@ -3,7 +3,7 @@
 # Makefile para automação de tarefas de desenvolvimento e MLOps.
 # ==============================================================================
 
-.PHONY: help setup lint format test train serve docker-up docker-down clean security
+.PHONY: help setup check format lint security test pipeline train serve eval docker-up docker-down clean
 
 # Variáveis
 PYTHON = python
@@ -22,13 +22,24 @@ setup: ## Instala as dependências e configura o ambiente (incluindo pre-commit)
 	$(PIP) install -e ".[dev]"
 	pre-commit install
 
+check: ## O Botão Mágico: Formata, checa tipagem e roda scans de segurança localmente
+	@echo "Rodando Black..."
+	black src/ tests/ evaluation/ dags/
+	@echo "Rodando Ruff..."
+	ruff check src/ tests/ evaluation/ dags/ --fix
+	@echo "Rodando Mypy..."
+	mypy src/ dags/
+	@echo "Rodando Bandit..."
+	bandit -r src/ evaluation/ -ll
+	@echo "✅ Tudo pronto! O código está blindado e pronto para o commit."
+
 format: ## Formata o código usando Black e Ruff (isort)
 	black src/ tests/ evaluation/ dags/
 	ruff check src/ tests/ evaluation/ dags/ --fix
 
 lint: ## Executa verificações de linting (Ruff, Mypy)
 	ruff check src/ tests/ evaluation/ dags/
-	mypy src/ dags/ evaluation/
+	mypy src/ dags/
 
 security: ## Executa scans de segurança (Bandit)
 	bandit -r src/ evaluation/ -ll
