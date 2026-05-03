@@ -54,9 +54,7 @@ def get_br_analyzer() -> AnalyzerEngine:
     )
     analyzer.registry.add_recognizer(phone_recognizer)
 
-    logger.info(
-        "Presidio Analyzer com padrões Brasileiros (LGPD) carregado com sucesso."
-    )
+    logger.info("Presidio Analyzer com padrões Brasileiros (LGPD) carregado com sucesso.")
     return analyzer
 
 
@@ -72,9 +70,7 @@ class PIIDetector:
             self.anonymizer = AnonymizerEngine()
             self.is_active = True
         except Exception as e:
-            logger.error(
-                f"Erro ao inicializar Presidio. O mascaramento falhará aberto. Erro: {e}"
-            )
+            logger.error(f"Erro ao inicializar Presidio. O mascaramento falhará aberto. Erro: {e}")
             self.is_active = False
 
         self.entities_to_find = [

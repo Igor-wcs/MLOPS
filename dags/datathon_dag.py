@@ -39,9 +39,7 @@ def check_drift_and_decide() -> bool:
     threshold = mon_cfg["drift"]["retrain_threshold"]
 
     logger.info("--- [DRIFT CHECK] ---")
-    logger.info(
-        f"Drift Detectado: {drift_share:.4f} | Limite para Retreino: {threshold:.4f}"
-    )
+    logger.info(f"Drift Detectado: {drift_share:.4f} | Limite para Retreino: {threshold:.4f}")
 
     # 3. Retorna True se o drift for maior que o threshold
     return bool(drift_share > threshold)
@@ -66,9 +64,7 @@ def validate_champion_challenger() -> bool:
     try:
         versions = client.search_model_versions(f"name='{model_name}'")
         if len(versions) < 2:
-            logger.info(
-                "Apenas uma versão disponível. Promoção automática para Champion."
-            )
+            logger.info("Apenas uma versão disponível. Promoção automática para Champion.")
             return True
 
         # Ordena por versão para pegar as duas mais recentes
@@ -89,15 +85,11 @@ def validate_champion_challenger() -> bool:
 
         # 3. Critério de Aceite: O erro deve ser menor ou igual ao anterior
         if rmse_challenger <= rmse_champion:
-            logger.info(
-                "✅ APROVADO: O novo modelo é superior ou igual. Promoção permitida."
-            )
+            logger.info("✅ APROVADO: O novo modelo é superior ou igual. Promoção permitida.")
             # Aqui poderíamos adicionar a lógica de transição de stage no MLflow
             return True
 
-        logger.info(
-            "❌ REPROVADO: O novo modelo degradou a performance. Mantendo Champion atual."
-        )
+        logger.info("❌ REPROVADO: O novo modelo degradou a performance. Mantendo Champion atual.")
         return False
 
     except Exception as e:

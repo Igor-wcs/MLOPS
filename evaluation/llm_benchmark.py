@@ -55,9 +55,7 @@ def run_benchmark() -> None:
     duration = t_end - t_start
     tps = total_tokens / duration
 
-    logger.info(
-        f"Resposta Gerada: {tok.decode(out[0], skip_special_tokens=True)[len(prompt) :]}"
-    )
+    logger.info(f"Resposta Gerada: {tok.decode(out[0], skip_special_tokens=True)[len(prompt) :]}")
     logger.info("-" * 50)
     logger.info(f"Tokens Gerados: {total_tokens}")
     logger.info(f"Duração: {duration:.2f}s")

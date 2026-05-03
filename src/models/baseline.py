@@ -98,9 +98,7 @@ def run_baselines() -> None:
     # --- RODO 1: O RIDGE ---
     with mlflow.start_run(run_name=f"Baseline_Ridge_{ticker}"):
         logger.info("Executando Ridge...")
-        ridge_model, ridge_metrics = train_ridge_baseline(
-            x_train, y_train, x_test, y_test
-        )
+        ridge_model, ridge_metrics = train_ridge_baseline(x_train, y_train, x_test, y_test)
 
         mlflow.log_params(
             {"model_type": "baseline_ridge", "window_size": cfg["data"]["window_size"]}

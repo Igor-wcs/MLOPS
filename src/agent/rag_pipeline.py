@@ -43,9 +43,7 @@ class RAGPipeline:
         logger.info(f"Inicializando Embeddings no device: {self.device}")
 
         # Carregamento Único do Modelo de Embeddings
-        model_name = self.rag_cfg.get(
-            "embedding_model", "sentence-transformers/all-MiniLM-L6-v2"
-        )
+        model_name = self.rag_cfg.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2")
         self.embeddings = HuggingFaceEmbeddings(
             model_name=model_name,
             model_kwargs={"device": self.device},
@@ -72,9 +70,7 @@ class RAGPipeline:
         docs_dir = Path(self.docs_dir)
         if not docs_dir.exists():
             docs_dir.mkdir(parents=True, exist_ok=True)
-            logger.warning(
-                f"Diretório de documentos criado, mas está vazio: {docs_dir}"
-            )
+            logger.warning(f"Diretório de documentos criado, mas está vazio: {docs_dir}")
             return
 
         # Verificação de Ingestão Incremental
@@ -93,12 +89,8 @@ class RAGPipeline:
         logger.info(f"Iniciando ingestão de novos documentos em {docs_dir}...")
 
         # Carregadores em lote
-        txt_loader = DirectoryLoader(
-            str(docs_dir), glob="**/*.txt", loader_cls=TextLoader
-        )
-        pdf_loader = DirectoryLoader(
-            str(docs_dir), glob="**/*.pdf", loader_cls=PyPDFLoader
-        )
+        txt_loader = DirectoryLoader(str(docs_dir), glob="**/*.txt", loader_cls=TextLoader)
+        pdf_loader = DirectoryLoader(str(docs_dir), glob="**/*.pdf", loader_cls=PyPDFLoader)
 
         raw_documents = txt_loader.load() + pdf_loader.load()
 
@@ -117,9 +109,7 @@ class RAGPipeline:
 
         # Inserção no Banco Vetorial
         self.vector_store.add_documents(documents=chunks)
-        logger.info(
-            f"Ingestão concluída: {len(chunks)} fragmentos adicionados ao ChromaDB."
-        )
+        logger.info(f"Ingestão concluída: {len(chunks)} fragmentos adicionados ao ChromaDB.")
 
     def retrieve(self, query: str, top_k: int | None = None) -> list[Document]:
         """Busca os contextos mais relevantes no banco para a pergunta atual."""

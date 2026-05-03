@@ -11,9 +11,7 @@ class TestAgentTools:
     def test_get_stock_tools_count(self) -> None:
         """Garante a exigência da Etapa 2 do Datathon (≥ 3 tools)."""
         tools = get_stock_tools()
-        assert (
-            len(tools) >= 3
-        ), "O Agente deve possuir pelo menos 3 ferramentas configuradas."
+        assert len(tools) >= 3, "O Agente deve possuir pelo menos 3 ferramentas configuradas."
 
     def test_tool_names_unique(self) -> None:
         """Garante que não há sobreposição de ferramentas no Agente."""
@@ -38,21 +36,15 @@ class TestAgentTools:
         names = [t.name for t in tools]
 
         # Verifica a existência das ferramentas chaves que criamos
-        has_prediction = any(
-            "predicao" in name.lower() or "lstm" in name.lower() for name in names
-        )
+        has_prediction = any("predicao" in name.lower() or "lstm" in name.lower() for name in names)
         has_rag = any(
-            "conhecimento" in name.lower()
-            or "rag" in name.lower()
-            or "documento" in name.lower()
+            "conhecimento" in name.lower() or "rag" in name.lower() or "documento" in name.lower()
             for name in names
         )
 
         assert has_prediction, "Ferramenta de predição LSTM não encontrada no Agente."
         # A ferramenta de RAG é vital para o Compliance e para não alucinar sobre dividendos
-        assert (
-            has_rag
-        ), "Ferramenta de consulta à base de conhecimento (RAG) não encontrada."
+        assert has_rag, "Ferramenta de consulta à base de conhecimento (RAG) não encontrada."
 
 
 class TestToolExecution:

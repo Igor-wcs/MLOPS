@@ -11,12 +11,8 @@ from src.agent.react_agent import RouterAgent
 @pytest.fixture
 def mock_tools():
     """Cria ferramentas mockadas para testar o roteamento."""
-    tool1 = Tool(
-        name="obter_previsao_lstm", func=lambda x: "Previsão Mock", description="lstm"
-    )
-    tool2 = Tool(
-        name="obter_cotacao_atual", func=lambda x: "Cotação Mock", description="cotação"
-    )
+    tool1 = Tool(name="obter_previsao_lstm", func=lambda x: "Previsão Mock", description="lstm")
+    tool2 = Tool(name="obter_cotacao_atual", func=lambda x: "Cotação Mock", description="cotação")
     tool3 = Tool(
         name="consultar_base_conhecimento",
         func=lambda x: "RAG Mock",

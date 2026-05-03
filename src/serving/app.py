@@ -134,9 +134,7 @@ def startup_event() -> None:
         nome_modelo = state.config["paths"]["registered_model_name"]
         logger.info(f"Buscando modelo '{nome_modelo}' no MLflow Registry...")
 
-        state.model = mlflow.pytorch.load_model(f"models:/{nome_modelo}/latest").to(
-            state.device
-        )
+        state.model = mlflow.pytorch.load_model(f"models:/{nome_modelo}/latest").to(state.device)
         state.model.eval()
 
         client = MlflowClient()
@@ -174,15 +172,11 @@ async def readiness() -> dict[str, str]:
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_handler(
-    request: Request, exc: RequestValidationError
-) -> JSONResponse:
+async def validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Captura erros de validação do Pydantic e retorna 400 em vez de 422."""
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content=jsonable_encoder(
-            {"detail": exc.errors(), "message": "Parâmetros inválidos."}
-        ),
+        content=jsonable_encoder({"detail": exc.errors(), "message": "Parâmetros inválidos."}),
     )
 
 
@@ -214,9 +208,7 @@ def predict(req: PredictRequest) -> dict[str, Any]:
         input_size = int(state.config["model"]["input_size"])
 
         # 1. Puxa do Feature Store (Dataframe Multivariado)
-        df_features = state.feature_store.obter_janela_predicao(
-            req.ticker, window_size=window_size
-        )
+        df_features = state.feature_store.obter_janela_predicao(req.ticker, window_size=window_size)
 
         # 2. Pré-processamento Multivariado
         dados_escalonados = state.scaler.transform(df_features.values)
@@ -246,9 +238,7 @@ def predict(req: PredictRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(ve)) from ve
     except Exception as e:
         logger.error(f"Erro na inferência: {e}")
-        raise HTTPException(
-            status_code=500, detail="Erro interno no pipeline de predição."
-        ) from e
+        raise HTTPException(status_code=500, detail="Erro interno no pipeline de predição.") from e
 
 
 @app.post("/agent", tags=["Agente"], response_model=AgentResponse)
@@ -260,9 +250,7 @@ async def agent_query(data: AgentRequest) -> AgentResponse:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
 
     if state.agent_executor is None:
-        raise HTTPException(
-            status_code=503, detail="Agente LLM não inicializado no startup."
-        )
+        raise HTTPException(status_code=503, detail="Agente LLM não inicializado no startup.")
 
     try:
         # 2. Processamento do LLM (Usa Singleton Singleton carregado no startup)
@@ -276,6 +264,4 @@ async def agent_query(data: AgentRequest) -> AgentResponse:
 
     except Exception as e:
         logger.error(f"Erro no Agente ReAct: {e}")
-        raise HTTPException(
-            status_code=500, detail="Falha na geração da resposta do LLM."
-        ) from e
+        raise HTTPException(status_code=500, detail="Falha na geração da resposta do LLM.") from e

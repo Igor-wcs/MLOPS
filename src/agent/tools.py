@@ -145,9 +145,7 @@ def obter_cotacao_atual(ticker: str) -> str:
             return f"Não foi possível encontrar dados recentes para o ticker {ticker}."
 
         preco_atual = dados["Close"].iloc[-1]
-        return (
-            f"A cotação atual (último fechamento) de {ticker} é R$ {preco_atual:.2f}."
-        )
+        return f"A cotação atual (último fechamento) de {ticker} é R$ {preco_atual:.2f}."
 
     except Exception as e:
         logger.error(f"Erro na tool de cotação: {e}")

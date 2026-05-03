@@ -21,9 +21,7 @@ load_dotenv()
 class EvaluationScore(BaseModel):
     """Schema para o LLM Juiz retornar notas estruturadas."""
 
-    fidelidade: int = Field(
-        description="Nota de 1 a 5 para fidelidade ao contexto (hallucination)"
-    )
+    fidelidade: int = Field(description="Nota de 1 a 5 para fidelidade ao contexto (hallucination)")
     relevancia: int = Field(description="Nota de 1 a 5 para relevância à pergunta")
     comentario: str = Field(description="Breve explicação da nota")
 
@@ -53,9 +51,7 @@ class LLMJudge:
         if not os.environ.get("OPENAI_API_KEY"):
             raise ValueError("OPENAI_API_KEY não encontrada no ambiente.")
 
-        self.llm = ChatOpenAI(model=model, temperature=0).with_structured_output(
-            EvaluationScore
-        )
+        self.llm = ChatOpenAI(model=model, temperature=0).with_structured_output(EvaluationScore)
 
         self.prompt = ChatPromptTemplate.from_messages(
             [
@@ -68,14 +64,10 @@ class LLMJudge:
             ]
         )
 
-    def evaluate(
-        self, question: str, ground_truth: str, answer: str
-    ) -> EvaluationScore:
+    def evaluate(self, question: str, ground_truth: str, answer: str) -> EvaluationScore:
         """Executa a avaliação de uma única resposta."""
         chain = self.prompt | self.llm
-        return chain.invoke(
-            {"question": question, "ground_truth": ground_truth, "answer": answer}
-        )
+        return chain.invoke({"question": question, "ground_truth": ground_truth, "answer": answer})
 
 
 # ==========================================
