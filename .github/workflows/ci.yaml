@@ -20,6 +20,8 @@ on:
       - "dags/**"
       - "configs/**"
       - "pyproject.toml"
+      - "requirements.txt"
+      - "Dockerfile"
       - ".github/workflows/ci.yaml"
 
 concurrency:

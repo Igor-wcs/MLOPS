@@ -1,6 +1,6 @@
 # 📈 Datathon Fase 5 - Sistema de MLOps & Agente Inteligente
 
-Bem-vindo ao projeto do **Grupo XX** para a Fase 5 do Datathon. Este repositório contém uma plataforma completa de Engenharia de Machine Learning (MLE), unindo previsões de séries temporais (LSTM) com um Agente Inteligente de IA (LLM) protegido por camadas robustas de segurança e monitoramento.
+Bem-vindo ao projeto do **Grupo 63** para a Fase 5 do Datathon. Este repositório contém uma plataforma completa de Engenharia de Machine Learning (MLE), unindo previsões de séries temporais (LSTM) com um Agente Inteligente de IA (LLM) protegido por camadas robustas de segurança e monitoramento.
 
 ---
 
@@ -99,5 +99,5 @@ Se precisar rodar testes ou verificar a saúde do sistema:
 *   **Limpar arquivos temporários:** `make clean` (requer `make` instalado)
 
 ---
-**Grupo XX - Datathon 2026**
+**Grupo 63 - Datathon 2026**
 *Este projeto segue rigorosamente os padrões de MLOps Nível 2 e conformidade LGPD.*
