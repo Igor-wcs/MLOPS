@@ -2,7 +2,8 @@ import logging
 import os
 import sys
 from datetime import datetime, timedelta
-
+import yaml
+from mlflow.tracking import MlflowClient
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator, ShortCircuitOperator
@@ -110,7 +111,7 @@ with DAG(
     dag_id="datathon_pipeline_mlops_v2",
     default_args=default_args,
     description="Pipeline MLOps Nível 2: Ingestão -> Drift -> DVC -> Champion-Challenger",
-    schedule_interval="@daily",
+    schedule="@daily",
     catchup=False,
     tags=["datathon", "mlops", "nivel-2", "automated-governance"],
 ) as dag:
