@@ -90,7 +90,7 @@ class RAGPipeline:
 
         # Carregadores em lote
         txt_loader = DirectoryLoader(str(docs_dir), glob="**/*.txt", loader_cls=TextLoader)
-        pdf_loader = DirectoryLoader(str(docs_dir), glob="**/*.pdf", loader_cls=PyPDFLoader)
+        pdf_loader = DirectoryLoader(str(docs_dir), glob="**/*.pdf", loader_cls=PyPDFLoader)  # type: ignore
 
         raw_documents = txt_loader.load() + pdf_loader.load()
 

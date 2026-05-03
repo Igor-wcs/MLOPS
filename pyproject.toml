@@ -137,9 +137,8 @@ known-first-party = ["src", "tests", "evaluation"]
 python_version = "3.11"
 # strict = true (Removido para evitar a trava no CI do Datathon)
 ignore_missing_imports = true
-disallow_any_returns = false
 disallow_untyped_calls = false
-exclude = ["notebooks", "venv", ".venv"]
+exclude = ["notebooks", "venv", ".venv", "evaluation"]
 plugins = ["pydantic.mypy"]
 
 # --- Adicionado: Ignora erros de tipagem em libs externas gordinhas ---

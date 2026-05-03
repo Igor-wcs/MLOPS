@@ -127,7 +127,7 @@ class PIIDetector:
 
         anonymized_result = self.anonymizer.anonymize(
             text=text,
-            analyzer_results=results,
+            analyzer_results=results,  # type: ignore
         )
 
         return str(anonymized_result.text)
