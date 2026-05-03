@@ -45,7 +45,7 @@ def get_rag_pipeline() -> RAGPipeline:
     """
     if _RAG_CACHE["instance"] is None:
         _RAG_CACHE["instance"] = RAGPipeline()
-    
+
     # Adicionando garantia para o Mypy não reclamar de retorno None
     assert _RAG_CACHE["instance"] is not None
     return _RAG_CACHE["instance"]
