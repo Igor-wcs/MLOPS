@@ -79,8 +79,9 @@ class RedisFeatureStore:
         if not todos_dados:
             raise ValueError(f"Ticker {ticker} não encontrado no Store.")
 
-        # Força o Mypy a entender que todos_dados é um dicionário real, não uma promessa
-        assert isinstance(todos_dados, dict)
+        # Força o Mypy a entender que todos_dados é um dicionário real
+        if not isinstance(todos_dados, dict):
+            raise TypeError("Os dados retornados do Redis não são um dicionário.")
 
         # Ordenamos pelas datas e pegamos os últimos 'window_size' registros
         datas_ordenadas = sorted(todos_dados.keys())
