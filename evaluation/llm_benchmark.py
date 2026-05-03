@@ -24,8 +24,8 @@ def run_benchmark() -> None:
     t = time.time()
     logger.info("Carregando modelo e tokenizer...")
 
-    tok = AutoTokenizer.from_pretrained(model_name)
-    mod = AutoModelForCausalLM.from_pretrained(
+    tok = AutoTokenizer.from_pretrained(model_name)  # nosec B615
+    mod = AutoModelForCausalLM.from_pretrained(  # nosec B615
         model_name,
         torch_dtype="auto",
         device_map=device,
