@@ -17,13 +17,13 @@ def load_config() -> dict[str, Any]:
     """Carrega as configurações do modelo."""
     # 1. Pega o caminho absoluto da pasta onde este script está salvo (src/features/)
     current_dir = Path(__file__).resolve().parent
-    
+
     # 2. Volta dois níveis de pasta para chegar na raiz do projeto
-    project_root = current_dir.parent.parent 
-    
+    project_root = current_dir.parent.parent
+
     # 3. Monta o caminho absoluto até o yaml
     config_path = project_root / "configs" / "model_config.yaml"
-    
+
     # 4. Abre o arquivo usando o caminho absoluto garantido
     with open(config_path, encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
