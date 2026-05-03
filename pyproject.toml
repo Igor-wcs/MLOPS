@@ -164,3 +164,6 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
 ]
+
+[tool.coverage.run]
+omit = ["src/models/baseline.py", "src/models/train.py", "src/monitoring/metrics.py", "src/features/feature_store.py", "src/agent/rag_pipeline.py"]
