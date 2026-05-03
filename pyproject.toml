@@ -36,8 +36,8 @@ dependencies = [
     "langchain-chroma>=0.1.0",      # Adicionado para o Banco Vetorial
     "ragas>=0.1.7",
     "datasets>=2.19.0",
-    "transformers>=4.39.3",
-    "sentence-transformers>=2.7.0", # Adicionado para os embeddings locais
+    "transformers==4.39.3",
+    "sentence-transformers==2.7.0",
     "accelerate>=0.28.0",
     "pypdf>=4.1.0",                 
 
