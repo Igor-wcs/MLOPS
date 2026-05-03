@@ -1,109 +1,101 @@
-# 📈 Datathon Fase 5 - Sistema de ML + LLM Agent
+# 📈 Datathon Fase 5 - Sistema de MLOps & Agente Inteligente
 
-Bem-vindo ao projeto do **Grupo XX** para a Fase 5 do Datathon. Este sistema é uma plataforma completa de Engenharia de Machine Learning (MLE) que combina previsões de séries temporais (LSTM) com um Agente Inteligente (ReAct + RAG) protegido por camadas de segurança e monitoramento de última geração.
-
----
-
-## 📖 Guia de Inicialização (Passo a Passo)
-
-Este guia foi feito para que você consiga rodar o projeto do zero, mesmo sem conhecer todos os comandos.
-
-### 🏗️ 1. Preparando o Terreno
-Abra o seu terminal (PowerShell no Windows ou Terminal no Mac/Linux).
-
-1.  **Baixe o Código:**
-    ```bash
-    git clone <URL_DO_SEU_REPOSITORIO>
-    cd datathon-grupo-XX
-    ```
-
-2.  **Configure suas Chaves (Secrets):**
-    Renomeie o arquivo `.env.example` para apenas `.env` e abra-o em um editor de texto. Insira sua chave da OpenAI na linha:
-    `OPENAI_API_KEY=sua_chave_aqui`
-
-3.  **Crie o Ambiente de Trabalho (Python):**
-    ```bash
-    python -m venv .venv
-    # Para Windows:
-    .\.venv\Scripts\activate
-    # Para Mac/Linux:
-    source .venv/bin/activate
-
-    pip install -e .
-    ```
+Bem-vindo ao projeto do **Grupo XX** para a Fase 5 do Datathon. Este repositório contém uma plataforma completa de Engenharia de Machine Learning (MLE), unindo previsões de séries temporais (LSTM) com um Agente Inteligente de IA (LLM) protegido por camadas robustas de segurança e monitoramento.
 
 ---
 
-### 🐳 2. Ligando as Ferramentas (Docker)
-O projeto usa o Docker para gerenciar bancos de dados e painéis de controle.
-```bash
+## 📂 Estrutura do Projeto
+
+Para facilitar sua navegação, aqui está o que você encontrará em cada pasta:
+
+*   **`configs/`**: Arquivos de configuração do modelo, monitoramento e métricas.
+*   **`dags/`**: Fluxos de automação para o Airflow (Retreino automático).
+*   **`data/`**: Base de conhecimento (RAG), documentos de compliance e conjuntos de teste.
+*   **`docs/`**: Documentação técnica detalhada (Arquitetura, LGPD, OWASP, etc).
+*   **`evaluation/`**: Scripts para avaliar a qualidade das respostas da IA.
+*   **`notebooks/`**: Análises exploratórias e experimentos iniciais.
+*   **`src/`**: O "coração" do sistema (Agente, Modelo LSTM, Segurança e API).
+*   **`tests/`**: Testes automatizados para garantir que nada quebre.
+
+---
+
+## 🛠️ Guia de Instalação Passo a Passo (PowerShell)
+
+Este guia foi feito para que qualquer pessoa consiga rodar o projeto do zero. Siga os comandos na ordem exata.
+
+### 1. Clonar e Preparar o Ambiente
+Abra o seu **PowerShell** e cole os comandos abaixo:
+
+```powershell
+# 1. Baixe o código do projeto
+git clone <URL_DO_REPOSITORIO>
+cd datathon-grupo-XX
+
+# 2. Configure suas chaves de acesso
+# (Renomeia o exemplo e você deve abrir o arquivo .env e colocar sua OPENAI_API_KEY)
+Copy-Item .env.example .env
+
+# 3. Crie o ambiente isolado do Python
+python -m venv .venv
+
+# 4. Ative o ambiente
+.\.venv\Scripts\Activate.ps1
+
+# 5. Instale as dependências e o projeto
+pip install -e .
+```
+
+### 2. Iniciar a Infraestrutura (Docker)
+O sistema precisa de bancos de dados e painéis que rodam dentro do Docker. Certifique-se de que o **Docker Desktop** esteja aberto.
+
+```powershell
 docker-compose up -d
 ```
-*Isso ativa o Redis, Prometheus, Grafana, Airflow e o MLflow.*
+*Aguarde alguns minutos até que todos os containers fiquem verdes no Docker Desktop.*
 
----
+### 3. Treinar e Preparar a IA
+Agora vamos ensinar o sistema a prever preços e ler os manuais.
 
-### 🧠 3. Treinando a Inteligência Artificial
-Agora, vamos ensinar o sistema a prever ações e a ler os manuais da empresa.
+```powershell
+# 1. Treinar o modelo de previsão (Petrobras)
+datathon-train
 
-1.  **Treinar a Previsão de Ações (Petrobras):**
-    ```bash
-    datathon-train
-    ```
-    *Ele baixará os dados mais recentes, treinará a IA e salvará a "versão oficial" no sistema.*
-
-2.  **Ensinar as Regras da Empresa (RAG):**
-    ```bash
-    python src/agent/rag_pipeline.py
-    ```
-    *Isso alimenta o banco de conhecimento com os documentos de compliance e política.*
-
----
-
-### 🚀 4. Iniciando o Servidor (O Cérebro)
-Com tudo pronto, ligue o servidor que responde às perguntas.
-```bash
-uvicorn src.serving.app:app --port 8000
+# 2. Indexar os documentos na base de conhecimento (RAG)
+python src/agent/rag_pipeline.py
 ```
-> **Atenção:** Mantenha este terminal aberto! Se fechar, o sistema para de responder.
+
+### 4. Ligar o Servidor Principal
+Este é o comando que ativa a API para você conversar com o agente.
+
+```powershell
+uvicorn src.serving.app:app --port 8000 --reload
+```
+> **Dica:** Mantenha esta janela do terminal aberta. Se fechar, o sistema para de responder.
 
 ---
 
-### 🧪 5. Prova de Qualidade (Testes e Drift)
-Para mostrar que o código é profissional e seguro:
+## 📊 Central de Dashboards (Acesso Rápido)
 
-1.  **Rodar Testes Automatizados:**
-    ```bash
-    pytest --cov=src
-    ```
-    *Verifique se a cobertura está acima de 60%.*
+Com o sistema rodando, você pode acessar todas as ferramentas de governança através do seu navegador:
 
-2.  **Gerar Relatório de Mudança de Mercado (Drift):**
-    ```bash
-    python -m src.monitoring.drift
-    ```
-    *Isso cria um arquivo chamado `drift_report.html` na pasta do projeto. Abra-o no seu navegador para ver os gráficos.*
+| Ferramenta | O que faz? | Endereço (URL) |
+| :--- | :--- | :--- |
+| **🤖 Chat da IA** | Interface para testar o Agente (Swagger) | [http://localhost:8000/docs](http://localhost:8000/docs) |
+| **📈 MLflow** | Gestão de Modelos e Experimentos | [http://localhost:5000](http://localhost:5000) |
+| **📉 Grafana** | Painéis de monitoramento técnico | [http://localhost:3000](http://localhost:3000) |
+| **⏱️ Airflow** | Agendamento de tarefas e retreino | [http://localhost:8080](http://localhost:8080) |
+| **📡 Prometheus** | Coleta de métricas em tempo real | [http://localhost:9090](http://localhost:9090) |
 
 ---
 
-### 📊 6. Dashboards e Apresentação (Demo Day)
-Acesse estes links no seu navegador para mostrar as evidências à banca:
+## 🧪 Comandos Úteis para Auditoria
 
-*   **Agente Inteligente (Swagger):** [http://localhost:8000/docs](http://localhost:8000/docs) (Use o botão "Try it out" no endpoint `/agent`).
-*   **Gestão de Modelos (MLflow):** [http://localhost:5000](http://localhost:5000) (Mostre a versão do modelo e as tags de governança).
-*   **Orquestração (Airflow):** [http://localhost:8080](http://localhost:8080) (Mostre o fluxo de treinamento automático).
-*   **Monitoramento (Grafana):** [http://localhost:3000](http://localhost:3000).
+Se precisar rodar testes ou verificar a saúde do sistema:
 
----
-
-## 🛠️ Resumo de Comandos
-
-| Objetivo | Comando |
-| :--- | :--- |
-| **Iniciar Infraestrutura** | `docker-compose up -d` |
-| **Treinar IA** | `datathon-train` |
-| **Subir Servidor** | `uvicorn src.serving.app:app` |
-| **Limpar Tudo** | `make clean` |
+*   **Rodar Testes de Qualidade:** `pytest`
+*   **Gerar Relatório de Drift (Mudança de Dados):** `python -m src.monitoring.drift`
+*   **Limpar arquivos temporários:** `make clean` (requer `make` instalado)
 
 ---
 **Grupo XX - Datathon 2026**
+*Este projeto segue rigorosamente os padrões de MLOps Nível 2 e conformidade LGPD.*

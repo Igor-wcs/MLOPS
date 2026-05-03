@@ -1,93 +1,66 @@
-# 📂 Estrutura do Projeto (Filtrada)
+# 📂 Estrutura do Projeto (Completa)
 
-Esta listagem contém as pastas e arquivos do código-fonte e configurações, excluindo arquivos binários, dados pesados e diretórios de cache/ambiente.
+Esta listagem contém a estrutura organizacional do projeto Datathon Fase 5, detalhando a função de cada diretório e arquivos principais.
 
 ## 📁 Diretório Raiz
-- `.env.example` - Template de variáveis de ambiente.
-- `.gitignore` - Arquivos ignorados pelo Git.
-- `contexto_projeto.txt` - Contexto do projeto.
-- `docker-compose.yaml` - Configuração do Docker Compose.
-- `Dockerfile` - Receita da imagem Docker.
-- `dvc.yaml` - Pipeline do DVC.
-- `dvc.lock` - Lockfile do DVC.
-- `GEMINI.md` - Instruções do projeto.
-- `Makefile` - Atalhos de comando.
-- `mlflow.db` - Banco de dados do MLflow (Metadados).
-- `prompt_auditoria.txt` - Prompt para auditoria.
-- `pyproject.toml` - Gerenciamento de dependências e ferramentas.
-- `README.md` - Documentação principal.
+- `.env` - Variáveis de ambiente locais (não versionado).
+- `.env.example` - Template para configuração de chaves de API.
+- `.gitignore` - Regras de exclusão para o Git.
+- `coverage.xml` - Relatório de cobertura de testes gerado pelo Pytest.
+- `Datathon - Fase 5 (1).pdf` - Documento de requisitos oficiais.
+- `demo_day.py` - Script para demonstração final do projeto.
+- `docker-compose.yaml` - Orquestração de serviços (Redis, Prometheus, Grafana, MLflow).
+- `Dockerfile` - Definição da imagem para o container da API.
+- `dvc.yaml` / `dvc.lock` - Gerenciamento de pipelines de dados e reprodutibilidade.
+- `Makefile` - Comandos utilitários para automação de tarefas.
+- `mlflow.db` - Banco de dados local para rastreamento de experimentos.
+- `model_weights.pt` - Pesos do modelo LSTM treinado (Champion).
+- `pyproject.toml` - Configuração central de dependências e ferramentas (Ruff, Mypy, Pytest).
+- `ragas_detailed_report.csv` - Relatório detalhado de avaliação do RAG.
+- `README.md` - Guia principal de inicialização e uso.
+- `requirements.txt` - Lista de dependências para instalação rápida.
+- `scaler.pkl` - Objeto scaler utilizado para normalização de dados.
 
 ## 📁 configs/
-- `model_config.yaml` - Configurações do modelo e caminhos.
-- `monitoring_config.yaml` - Configurações de monitoramento e drift.
-- `prometheus.yaml` - Configuração do Prometheus.
+- `model_config.yaml` - Hiperparâmetros do modelo e configurações do pipeline.
+- `monitoring_config.yaml` - Regras de drift, alertas e guardrails de segurança.
+- `prometheus.yaml` - Configuração do sistema de métricas.
 
 ## 📁 dags/
-- `datathon_dag.py` - DAG do Airflow para o pipeline.
+- `datathon_dag.py` - Orquestração do pipeline de retreino via Airflow.
 
 ## 📁 data/
-- `documents/politica_investimento.txt` - Documento para a base RAG.
-- `golden_set/golden_set.json` - Conjunto de testes para avaliação.
+- `chroma_db/` - Banco de dados vetorial para o RAG.
+- `documents/` - Documentos de referência (ex: politica_investimento.txt).
+- `golden_set/` - Conjunto de teste para avaliação quantitativa do LLM.
+- `processed/` - Dados limpos e preparados para treino.
 
 ## 📁 docs/
-- `ARCHITECTURE.md` - Documentação da arquitetura.
-- `LGPD_PLAN.md` - Plano de conformidade LGPD.
-- `MODEL_CARD.md` - Ficha técnica do modelo.
-- `OWASP_MAPPING.md` - Mapeamento de segurança OWASP.
-- `RED_TEAM_REPORT.md` - Relatório de testes adversariais.
-- `REQUIREMENTS.md` - Requisitos extraídos do PDF.
-- `SYSTEM_CARD.md` - Ficha técnica do sistema de agentes.
+- `ARCHITECTURE.md` - Visão técnica e diagramas do sistema.
+- `LGPD_PLAN.md` - Estratégia de privacidade e anonimização.
+- `MODEL_CARD.md` - Detalhes do modelo LSTM (PETR4).
+- `OWASP_MAPPING.md` - Mitigação de vulnerabilidades de IA e API.
+- `PROJECT_STRUCTURE.md` - Este documento.
+- `RED_TEAM_REPORT.md` - Resultados de testes adversariais.
+- `REQUIREMENTS.md` - Checklist de requisitos cumpridos.
+- `SYSTEM_CARD.md` - Detalhes do agente inteligente e governança.
 
 ## 📁 evaluation/
-- `llm_benchmark.py` - Script de benchmark de LLMs.
-- `llm_judge.py` - Avaliação qualitativa via LLM.
-- `ragas_eval.py` - Avaliação quantitativa de RAG.
+- `llm_benchmark.py` - Comparação de performance entre modelos.
+- `llm_judge.py` - Avaliação qualitativa automatizada.
+- `ragas_eval.py` - Cálculo de métricas de fidelidade e relevância do RAG.
 
 ## 📁 notebooks/
-- `01_eda.ipynb` - Notebook de análise exploratória.
-- `02_eda.ipynb` - Notebook complementar.
+- `01_eda.ipynb` - Análise exploratória de dados inicial.
+- `02_eda.ipynb` - Experimentos e visualizações adicionais.
 
-## 📁 src/
-- `__init__.py`
-
-### 📁 src/agent/
-- `__init__.py`
-- `rag_pipeline.py` - Lógica do pipeline RAG.
-- `react_agent.py` - Implementação do Agente ReAct/Router.
-- `tools.py` - Ferramentas disponíveis para o agente.
-
-### 📁 src/features/
-- `__init__.py`
-- `feature_engineering.py` - Lógica de transformação de dados.
-- `feature_store.py` - Interface com o Redis Feature Store.
-
-### 📁 src/models/
-- `__init__.py`
-- `baseline.py` - Modelo de baseline simples.
-- `lstm_factory.py` - Factory para criação do modelo LSTM.
-- `lstm_model.py` - Arquitetura da rede neural LSTM.
-- `lstm_params.py` - Definição de hiperparâmetros.
-- `train.py` - Script principal de treinamento e tracking.
-
-### 📁 src/monitoring/
-- `__init__.py`
-- `drift.py` - Detecção de Data e Target Drift.
-- `metrics.py` - Métricas customizadas para Prometheus.
-
-### 📁 src/security/
-- `__init__.py`
-- `guardrails.py` - Implementação de Input/Output Guardrails.
-- `pii_detection.py` - Motor de detecção de PII (Presidio).
-
-### 📁 src/serving/
-- `__init__.py`
-- `app.py` - API FastAPI para servir predições e o agente.
-- `requirements.txt` - Dependências específicas para o container de serving.
+## 📁 src/ (Código Fonte)
+- `agent/` - Implementação do Agente ReAct, RAG e ferramentas.
+- `features/` - Engenharia de features e integração com Redis.
+- `models/` - Arquitetura, treinamento e factory do modelo LSTM.
+- `monitoring/` - Detecção de drift e métricas operacionais.
+- `security/` - Guardrails e detecção de PII (LGPD).
+- `serving/` - API FastAPI para disponibilização do sistema.
 
 ## 📁 tests/
-- `conftest.py` - Configurações e fixtures do pytest.
-- `test_agent.py` - Testes do agente financeiro.
-- `test_api.py` - Testes dos endpoints da API.
-- `test_features.py` - Testes de engenharia de features.
-- `test_guardrails.py` - Testes de segurança e guardrails.
-- `test_models.py` - Testes da lógica do modelo e métricas.
+- Testes unitários e de integração cobrindo todos os módulos do `src/`.

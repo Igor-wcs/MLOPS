@@ -86,7 +86,7 @@ def validate_champion_challenger() -> bool:
         # 3. Critério de Aceite: O erro deve ser menor ou igual ao anterior
         if rmse_challenger <= rmse_champion:
             logger.info("✅ APROVADO: O novo modelo é superior ou igual. Promoção permitida.")
-            # Aqui 
+            # Aqui
             return True
 
         logger.info("❌ REPROVADO: O novo modelo degradou a performance. Mantendo Champion atual.")

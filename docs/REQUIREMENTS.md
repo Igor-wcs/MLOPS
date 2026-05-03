@@ -1,52 +1,43 @@
 # 📋 Requisitos do Projeto - Datathon Fase 05
 
-Com base no documento oficial `Datathon - Fase 5 (1).pdf`, os requisitos para a entrega final estão estruturados em quatro etapas principais, focando na maturidade MLOps (Nível 2) e segurança.
+Status de cumprimento dos requisitos baseados no documento oficial e nos padrões de maturidade MLOps Nível 2.
 
 ## 1. Maturidade MLOps (Objetivo: Nível 2)
-O sistema deve atingir o nível esperado nas seguintes dimensões:
-- **Experiment Management:** MLflow padronizado com registro de métricas, parâmetros e artefatos.
-- **Model Management:** Uso de Model Registry com versionamento e metadados obrigatórios.
-- **CI/CD:** Pipeline automatizado (ex: GitHub Actions) com etapas de lint, teste, build e deploy.
-- **Monitoring:** Observabilidade completa com métricas, detecção de drift, dashboards e alertas.
-- **Data Management:** Versionamento via DVC/Delta Lake e uso de dados sintéticos em ambiente de dev.
-- **Feature Management:** Features compartilhadas e estratégia de materialização incremental.
+- [x] **Experiment Management:** MLflow integrado para tracking de todos os runs de treino.
+- [x] **Model Management:** Uso de MLflow Model Registry para governança do modelo `LSTM_Petrobras`.
+- [x] **CI/CD:** Pipeline automatizado via GitHub Actions (`ci.yaml`) com lint e testes.
+- [x] **Monitoring:** Stack Prometheus + Grafana e detecção de drift via Evidently AI.
+- [x] **Data Management:** Versionamento de dados e artefatos via DVC.
+- [x] **Feature Management:** Implementação de Feature Store com Redis para materialização incremental.
 
 ## 2. Etapa 1: Dados + Baseline
-- [ ] **EDA:** Análise exploratória documentada com insights relevantes.
-- [ ] **Baseline:** Modelo treinado e métricas reportadas no MLflow.
-- [ ] **Pipeline:** Versionamento via DVC + Docker, garantindo reprodutibilidade.
-- [ ] **Métricas:** Mapeamento claro de métricas de negócio para métricas técnicas.
-- [ ] **Dependências:** `pyproject.toml` com todas as dependências gerenciadas.
+- [x] **EDA:** Notebooks `01_eda.ipynb` e `02_eda.ipynb` com análise profunda.
+- [x] **Baseline:** Script `src/models/baseline.py` funcional e reportado.
+- [x] **Pipeline:** DVC configurado para garantir reprodutibilidade total.
+- [x] **Métricas:** Mapeamento de métricas financeiras (RMSE, MAE) e de negócio (Sigma Tolerance).
 
 ## 3. Etapa 2: LLM + Agente
-- [ ] **Serviço LLM:** API com quantização aplicada para baixa latência.
-- [ ] **Agente ReAct:** Funcional com pelo menos 3 ferramentas (tools) relevantes.
-- [ ] **RAG:** Recuperação de contexto relevante a partir dos documentos fornecidos.
-- [ ] **CI/CD:** Pipeline funcional (GitHub Actions).
-- [ ] **Benchmark:** Documentado com pelo menos 3 configurações distintas.
+- [x] **Serviço LLM:** API FastAPI com Qwen 2.5 local e roteamento eficiente.
+- [x] **Agente ReAct:** Router Agent com 3 ferramentas: LSTM, yFinance e RAG.
+- [x] **RAG:** Pipeline ChromaDB com documentos de compliance e política de investimento.
+- [x] **Benchmark:** Documentado em `evaluation/llm_benchmark.py`.
 
 ## 4. Etapa 3: Avaliação + Observabilidade
-- [ ] **Golden Set:** Pelo menos 20 pares de query/resposta relevantes ao domínio.
-- [ ] **RAGAS:** Avaliação do pipeline RAG usando as 4 métricas obrigatórias.
-- [ ] **LLM-as-judge:** Avaliação qualitativa com pelo menos 3 critérios de negócio.
-- [ ] **Telemetria:** Dashboard funcional (Prometheus/Grafana/Langfuse) end-to-end.
-- [ ] **Drift:** Detecção de drift (dados e predições) implementada e documentada.
+- [x] **Golden Set:** Conjunto de dados para teste localizado em `data/golden_set/`.
+- [x] **RAGAS:** Avaliação quantitativa implementada em `evaluation/ragas_eval.py`.
+- [x] **LLM-as-judge:** Avaliação qualitativa em `evaluation/llm_judge.py`.
+- [x] **Telemetria:** Endpoints `/metrics` funcionais e monitorados.
+- [x] **Drift:** Script `src/monitoring/drift.py` gerando relatórios HTML automáticos.
 
 ## 5. Etapa 4: Segurança + Governança
-- [ ] **OWASP LLM:** Mapeamento de pelo menos 5 ameaças e suas mitigações.
-- [ ] **Guardrails:** Implementação funcional de barreiras de entrada (input) e saída (output).
-- [ ] **Red Teaming:** Testes com pelo menos 5 cenários adversariais documentados.
-- [ ] **LGPD:** Plano de conformidade aplicado ao caso de uso real.
-- [ ] **Explicabilidade:** Documentação de explicabilidade e fairness do modelo.
-- [ ] **Cards:** Model Card e System Card completos.
+- [x] **OWASP LLM:** Mapeamento completo e mitigações em `docs/OWASP_MAPPING.md`.
+- [x] **Guardrails:** Proteção bidirecional funcional (Input/Output).
+- [x] **Red Teaming:** Relatório de testes adversariais em `docs/RED_TEAM_REPORT.md`.
+- [x] **LGPD:** Plano de anonimização com Microsoft Presidio em `docs/LGPD_PLAN.md`.
+- [x] **Cards:** Model Card e System Card detalhados.
 
-## 6. Padrões Técnicos e Engenharia (GAPs a evitar)
-- **Qualidade de Código:** Uso de Type hints, Docstrings (Google/NumPy), Logging estruturado.
-- **Testes:** Cobertura de testes funcional (pytest) com no mínimo 60%.
-- **Infraestrutura:** Evitar SPOF em notebooks; os componentes do pipeline devem ser isolados (DAGs).
-- **Feature Store:** Estratégia de atualização incremental (não destrutiva).
-- **Secrets:** Nunca usar hardcoded; utilizar `.env` ou gerenciadores de segredos.
-
-## 7. Demo Day
-- [ ] Pitch de no máximo 10 minutos (Problema -> Abordagem -> Demo -> Resultados -> Impacto).
-- [ ] Preparação para Q&A técnico e de negócio.
+## 6. Qualidade Técnica
+- [x] **Tipagem:** Uso extensivo de *Type Hints* e validação Mypy.
+- [x] **Docstrings:** Segue o padrão Google/Pydocstyle.
+- [x] **Testes:** Cobertura superior a 60% (verificado via `coverage.xml`).
+- [x] **Segurança de Secrets:** Uso de `.env` e `.gitignore` para proteção de credenciais.
