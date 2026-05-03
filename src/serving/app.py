@@ -107,7 +107,10 @@ def startup_event() -> None:
     """Inicializa configurações, hardware, Redis e baixa artefatos do MLflow."""
     try:
         with open("configs/model_config.yaml", encoding="utf-8") as f:
-            state.config = yaml.safe_load(f)
+            cfg_raw = yaml.safe_load(f)
+            if not cfg_raw:
+                raise RuntimeError("Arquivo de configuração vazio ou inválido.")
+            state.config = dict(cfg_raw)
 
         state.device = torch.device(
             "xpu"
@@ -165,6 +168,7 @@ async def readiness() -> dict[str, str]:
         state.model is not None
         and state.scaler is not None
         and state.feature_store is not None
+        and state.config is not None
     )
     return {"status": "ready" if is_ready else "not_ready", "device": str(state.device)}
 
@@ -198,16 +202,16 @@ async def trigger_training(background_tasks: BackgroundTasks) -> dict[str, str]:
 
 
 @app.post("/predict", tags=["Predição"])
-def predict(req: PredictRequest) -> dict[str, str | float | list[str]]:
+def predict(req: PredictRequest) -> dict[str, Any]:
     """Executa a predição LSTM multivariada para um ticker."""
-    if not state.model or not state.scaler or not state.feature_store:
+    if not state.model or not state.scaler or not state.feature_store or not state.config:
         raise HTTPException(
-            status_code=503, detail="Serviço indisponível (Model/Redis não carregados)."
+            status_code=503, detail="Serviço indisponível (Model/Redis/Config não carregados)."
         )
 
     try:
-        window_size = state.config["data"]["window_size"]
-        input_size = state.config["model"]["input_size"]
+        window_size = int(state.config["data"]["window_size"])
+        input_size = int(state.config["model"]["input_size"])
 
         # 1. Puxa do Feature Store (Dataframe Multivariado)
         df_features = state.feature_store.obter_janela_predicao(
@@ -263,9 +267,7 @@ async def agent_query(data: AgentRequest) -> AgentResponse:
     try:
         # 2. Processamento do LLM (Usa Singleton Singleton carregado no startup)
         result = query_agent(state.agent_executor, data.query)
-        resposta_bruta = result.get(
-            "answer", "Desculpe, não consegui processar a resposta."
-        )
+        resposta_bruta = str(result.get("answer", "Desculpe, não consegui processar a resposta."))
 
         # 3. Barreira de Saída (Output Guardrail - OWASP LLM06 / LGPD)
         resposta_segura = output_guard.sanitize(resposta_bruta)

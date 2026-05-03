@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 import mlflow
 import numpy as np
@@ -13,10 +14,11 @@ from torch import nn
 logger = logging.getLogger(__name__)
 
 
-def load_config(config_path: str = "configs/model_config.yaml") -> dict:
+def load_config(config_path: str = "configs/model_config.yaml") -> dict[str, Any]:
     """Carrega o arquivo de configuração YAML centralizado."""
     with open(config_path, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        cfg = yaml.safe_load(f)
+        return dict(cfg) if cfg else {}
 
 
 # ==========================================
@@ -26,7 +28,7 @@ def load_config(config_path: str = "configs/model_config.yaml") -> dict:
 
 def train_ridge_baseline(
     x_train: np.ndarray, y_train: np.ndarray, x_test: np.ndarray, y_test: np.ndarray
-) -> tuple[Ridge, dict]:
+) -> tuple[Ridge, dict[str, float]]:
     """Treina o baseline Ridge e retorna o modelo e métricas."""
     x_train_flat = x_train.reshape(x_train.shape[0], -1)
     x_test_flat = x_test.reshape(x_test.shape[0], -1)
@@ -71,7 +73,7 @@ class MLPBaseline(nn.Module):
 def run_baselines() -> None:
     """Pipeline de execução dos modelos baseline para comparação."""
     cfg = load_config()
-    ticker = cfg["data"]["ticker"]
+    ticker = str(cfg["data"]["ticker"])
 
     # --- CARREGAMENTO DE DADOS (DVC OUTS - Mesmo que o modelo campeão) ---
     try:
@@ -81,17 +83,17 @@ def run_baselines() -> None:
     except FileNotFoundError:
         logger.warning("Dados processados não encontrados. Usando Mock para baseline.")
         x_all = np.random.randn(
-            500, cfg["data"]["window_size"], cfg["model"]["input_size"]
+            500, int(cfg["data"]["window_size"]), int(cfg["model"]["input_size"])
         )
         y_all = np.random.randn(500)
 
     # Split cronológico consistente
-    split_idx = int(len(x_all) * (1 - cfg["data"]["test_size"]))
+    split_idx = int(len(x_all) * (1 - float(cfg["data"]["test_size"])))
 
     x_train, x_test = x_all[:split_idx], x_all[split_idx:]
     y_train, y_test = y_all[:split_idx], y_all[split_idx:]
 
-    mlflow.set_experiment(cfg["paths"]["experiment_name"])
+    mlflow.set_experiment(str(cfg["paths"]["experiment_name"]))
 
     # --- RODO 1: O RIDGE ---
     with mlflow.start_run(run_name=f"Baseline_Ridge_{ticker}"):
@@ -111,7 +113,7 @@ def run_baselines() -> None:
     with mlflow.start_run(run_name=f"Baseline_MLP_{ticker}"):
         logger.info("Executando MLP...")
         # Lógica resumida de treino do MLP para o baseline
-        input_dim = cfg["data"]["window_size"] * cfg["model"]["input_size"]
+        input_dim = int(cfg["data"]["window_size"]) * int(cfg["model"]["input_size"])
         mlp_model = MLPBaseline(input_dim=input_dim, hidden_dim=64)
         criterio = nn.MSELoss()
         otimizador = torch.optim.Adam(mlp_model.parameters(), lr=0.005)

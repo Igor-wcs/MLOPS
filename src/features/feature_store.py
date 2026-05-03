@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 def load_config() -> dict[str, Any]:
     """Carrega as configurações do modelo."""
     with open("configs/model_config.yaml", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        cfg = yaml.safe_load(f)
+        return dict(cfg) if cfg else {}
 
 
 class RedisFeatureStore:
@@ -52,7 +53,7 @@ class RedisFeatureStore:
         Armazena o vetor multivariado (OHLCV + EMA20) como string JSON.
         """
         cfg = load_config()
-        ttl_days = cfg.get("redis", {}).get("ttl_days", 90)
+        ttl_days = int(cfg.get("redis", {}).get("ttl_days", 90))
         chave_hash = f"features:{ticker}"
 
         # Engenharia de Features Multivariada
