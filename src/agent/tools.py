@@ -168,7 +168,7 @@ def consultar_base_conhecimento(query: str) -> str:
         contextos = rag.retrieve(query)
 
         if not contextos:
-            return "Não encontrei informações específicas sobre isso na base de conhecimento oficial." # noqa: E501
+            return "Não encontrei informações específicas sobre isso na base de conhecimento oficial."  # noqa: E501
 
         # Formata os contextos para o LLM
         resposta_base = "\n\n".join([doc.page_content for doc in contextos])
