@@ -1,7 +1,7 @@
 # 🛡️ Mapeamento de Segurança (OWASP) - Defesa em Profundidade
 
-**Projeto:** Datathon Fase 05 - Predição de Séries Temporais e Agentes LLM  
-**Módulo:** Governança e Segurança  
+**Projeto:** Datathon Fase 05 - Predição de Séries Temporais e Agentes LLM
+**Módulo:** Governança e Segurança
 
 ---
 

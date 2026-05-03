@@ -2,8 +2,8 @@
 # 1. MONITORAMENTO DO MODELO PREDITIVO E DRIFT
 # ==========================================
 drift:
-  warning_threshold: 0.1      
-  retrain_threshold: 0.2      
+  warning_threshold: 0.1
+  retrain_threshold: 0.2
   check_interval_minutes: 60
   reference_period: "1y"      # Período base para a API do yfinance extrair dados
   current_period: "1mo"       # Janela de análise em produção
@@ -19,7 +19,7 @@ quality_gate:
   sigma_tolerance: 0.5
 
 # ==========================================
-#     MONITORAMENTO OPERACIONAL 
+#     MONITORAMENTO OPERACIONAL
 # ==========================================
 prometheus:
   port: 9090

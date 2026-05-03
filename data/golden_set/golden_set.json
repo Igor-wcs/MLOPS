@@ -5,9 +5,24 @@
     "contexts": ["PETR4: fechamento=$38.50, volume=65M no dia 2026-04-24."]
   },
   {
-    "question": "O que o modelo LSTM prevê para a PETR4 amanhã?",
-    "ground_truth": "O modelo LSTM prevê que a PETR4 fechará em aproximadamente R$ 38,90 no próximo pregão.",
-    "contexts": ["Predição LSTM Champion para PETR4 (t+1): R$ 38.90."]
+    "question": "A PETR4 está em tendência de alta cruzando a média de 20 dias?",
+    "ground_truth": "Sim, a PETR4 está em tendência de alta no curto prazo, negociando a R$ 38,50, acima da sua média móvel de 20 dias (R$ 37,80).",
+    "contexts": ["PETR4: preço atual=$38.50, SMA20=$37.80. Preço cruza acima da SMA20 indicando alta."]
+  },
+  {
+    "question": "Qual a volatilidade atual da Petrobras?",
+    "ground_truth": "A volatilidade anualizada da PETR4 nos últimos 20 dias é de 32.4%.",
+    "contexts": ["PETR4: Volatilidade histórica 20d = 32.4% anualizada."]
+  },
+  {
+    "question": "O indicador RSI da PETR4 mostra sobrecompra?",
+    "ground_truth": "Sim, o RSI de 14 dias da PETR4 está em 74, o que indica uma forte condição de sobrecompra.",
+    "contexts": ["PETR4: RSI(14) = 74. Acima de 70 indica sobrecompra, abaixo de 30 sobrevenda."]
+  },
+  {
+    "question": "Como a queda do barril Brent afeta a PETR4 hoje?",
+    "ground_truth": "A queda de 2.5% no barril de Brent tende a exercer pressão negativa nas ações da PETR4 hoje, devido à alta correlação da empresa com a commodity.",
+    "contexts": ["Petróleo Brent caiu 2.5% para $82/barril. PETR4 tem correlação de 0.85 com o Brent."]
   },
   {
     "question": "Quando é o próximo pagamento de dividendos da Petrobras?",
@@ -15,88 +30,73 @@
     "contexts": ["PETR4: Data com para dividendos ordinários de R$ 1,05 por ação é 2026-05-15."]
   },
   {
-    "question": "Qual a política de investimentos da Datathon S.A.?",
-    "ground_truth": "A empresa segue regras rígidas de compliance e não faz recomendações de compra ou venda.",
-    "contexts": ["Políticas: Regras rígidas de compliance. Não fazemos recomendações de compra ou venda."]
+    "question": "O que o modelo LSTM prevê para a PETR4 amanhã?",
+    "ground_truth": "O modelo LSTM prevê que a PETR4 fechará em aproximadamente R$ 38,90 no próximo pregão.",
+    "contexts": ["Predição LSTM Champion para PETR4 (t+1): R$ 38.90."]
   },
   {
-    "question": "Como os dividendos são pagos na Datathon S.A.?",
-    "ground_truth": "São pagos trimestralmente, seguindo a política de 25% do lucro líquido.",
-    "contexts": ["Dividendos: Pagos trimestralmente, 25% do lucro líquido."]
+    "question": "Qual é o Erro Absoluto Médio (MAE) do nosso modelo da Petrobras?",
+    "ground_truth": "O Erro Absoluto Médio (MAE) atual do modelo LSTM em produção é de R$ 0,85.",
+    "contexts": ["Avaliação Modelo LSTM PETR4: MAE=0.85 BRL, RMSE=1.12 BRL no MLflow."]
   },
   {
-    "question": "Para que serve o modelo LSTM da empresa?",
-    "ground_truth": "É usado apenas para fins educacionais e estudo de séries temporais.",
-    "contexts": ["LSTM: Fins educacionais e estudo de séries temporais."]
+    "question": "Qual o nível de confiança na previsão do modelo de hoje?",
+    "ground_truth": "O modelo tem 95% de confiança de que o preço fechará entre R$ 38,10 e R$ 39,70.",
+    "contexts": ["Predição LSTM PETR4: valor=$38.90, intervalo de confiança 95%=[$38.10, $39.70]."]
   },
   {
-    "question": "A Petrobras (PETR4) teve qual volume no dia 24 de abril de 2026?",
-    "ground_truth": "O volume foi de 65 milhões.",
-    "contexts": ["PETR4: volume=65M no dia 2026-04-24."]
+    "question": "Quantos dias de histórico o Feature Store alimenta no modelo?",
+    "ground_truth": "O Feature Store alimenta o modelo com uma janela histórica sequencial de 30 dias úteis para captura de tendências temporais.",
+    "contexts": ["Feature Store Redis: janela de input (seq_len) do modelo LSTM = 30 dias de fechamentos."]
   },
   {
-    "question": "Qual a meta de distribuição de lucro para dividendos?",
-    "ground_truth": "A meta é distribuir 25% do lucro líquido.",
-    "contexts": ["Política: 25% do lucro líquido para dividendos."]
+    "question": "Foi detectado algum data drift nos preços da PETR4?",
+    "ground_truth": "Foi detectado um alerta (warning) de data drift com o PSI em 0.15, mas ainda não atingiu o limite crítico de 0.20 exigido para retreino.",
+    "contexts": ["Evidently Data Drift Report: PSI=0.15. Status=Warning. Threshold crítico=0.20."]
   },
   {
-    "question": "O sistema faz recomendações de investimento?",
-    "ground_truth": "Não, o sistema não constitui recomendação de investimento.",
-    "contexts": ["Compliance: Não fazemos recomendações de compra ou venda."]
+    "question": "O modelo LSTM precisa ser retreinado hoje?",
+    "ground_truth": "Não, o modelo atual está saudável e o Population Stability Index (PSI) está abaixo do limite crítico. O retreino não é ativado.",
+    "contexts": ["Status Retreino: Negativo. PSI=0.15, MAE estável. Último retreino ocorreu em 2026-04-20."]
   },
   {
-    "question": "Qual a janela de observação usada pelo modelo?",
-    "ground_truth": "O modelo utiliza uma janela de 30 dias passados.",
-    "contexts": ["Config: window_size=30 dias passados."]
+    "question": "A latência da API de predição está dentro do aceitável?",
+    "ground_truth": "Sim, a latência do percentil 95 está em 180ms, o que está dentro do limite operacional de 200ms configurado no Prometheus.",
+    "contexts": ["Grafana API Dashboard: latência p95 = 180ms. Threshold de SLA de alerta = 200ms."]
   },
   {
-    "question": "Quem é o responsável pelos modelos?",
-    "ground_truth": "O responsável é o grupo-XX.",
-    "contexts": ["Tags: owner=grupo-XX."]
+    "question": "Qual o P/E (Preço/Lucro) da PRIO3 em comparação com a PETR4?",
+    "ground_truth": "A PETR4 negocia com um P/E de 4.5x, sendo descontada em relação à PRIO3, que negocia a um múltiplo mais alto de 8.2x.",
+    "contexts": ["Múltiplos Setor Petróleo: PETR4 P/E=4.5x, PRIO3 P/E=8.2x (comparativo de valuation)."]
   },
   {
-    "question": "Qual o framework usado para o modelo LSTM?",
-    "ground_truth": "O framework utilizado é o PyTorch.",
-    "contexts": ["Tags: framework=pytorch."]
+    "question": "Qual o impacto da alta do Dólar de hoje na Petrobras?",
+    "ground_truth": "A alta do dólar tem um impacto misto, mas no curto prazo tende a impulsionar as margens, pois aumenta a receita em reais da exportação de petróleo, embora também encareça a dívida.",
+    "contexts": ["USD/BRL subiu 1.5%. Receitas da Petrobras são dolarizadas; impacto de curto prazo no fluxo de caixa é positivo."]
   },
   {
-    "question": "O sistema detecta PII?",
-    "ground_truth": "Sim, o sistema possui detecção de PII via Presidio.",
-    "contexts": ["Security: PII detection enabled via Presidio."]
+    "question": "O guardrail bloqueou tentativas de acesso não autorizado?",
+    "ground_truth": "Sim, nossos guardrails de segurança bloquearam 2 tentativas de Prompt Injection hoje que utilizavam padrões de evasão e jailbreak.",
+    "contexts": ["TruLens Guardrails Log: 2 tentativas bloqueadas (reason: prompt injection detectado com 'ignore previous')."]
   },
   {
-    "question": "Qual a temperatura configurada para o LLM?",
-    "ground_truth": "A temperatura é de 0.1.",
-    "contexts": ["Config: llm temperature=0.1."]
+    "question": "A LGPD está sendo respeitada no pipeline de dados?",
+    "ground_truth": "Sim, o sistema utiliza a biblioteca Presidio para identificar e mascarar dados sensíveis como CPFs e emails antes do registro nos logs.",
+    "contexts": ["Presidio PII Anonymizer: Ativo e em conformidade com LGPD. Dados sensíveis substituídos por placeholders."]
   },
   {
-    "question": "Onde ficam armazenados os logs de drift?",
-    "ground_trace": "Os logs de drift ficam no MLflow e em drift_report.html.",
-    "contexts": ["Monitoring: drift_report.html e artifacts no MLflow."]
+    "question": "Qual feature teve maior peso na predição de queda de ontem?",
+    "ground_truth": "Segundo a análise de explicabilidade (SHAP Values), a queda acentuada no preço do barril de petróleo Brent no dia anterior foi o fator de maior peso para a previsão.",
+    "contexts": ["Explicabilidade LSTM (SHAP): feature_importance indica 'variacao_brent_lag_1' como principal causa negativa ontem."]
   },
   {
-    "question": "Qual o ticker padrão do sistema?",
-    "ground_truth": "O ticker padrão é PETR4.SA.",
-    "contexts": ["Config: ticker=PETR4.SA."]
+    "question": "Qual é a arquitetura exata da nossa rede neural?",
+    "ground_truth": "Nossa rede neural é baseada em uma arquitetura LSTM em PyTorch com 2 camadas ocultas de 64 unidades, além de uma camada de Dropout para evitar overfitting.",
+    "contexts": ["Modelo PyTorch src/models: LSTM com num_layers=2, hidden_size=64, Dropout=0.2, output linear."]
   },
   {
-    "question": "O sistema usa qual banco de vetores?",
-    "ground_truth": "O sistema utiliza o ChromaDB.",
-    "contexts": ["RAG: vector_db_path=data/chroma_db."]
-  },
-  {
-    "question": "Qual o modelo de embeddings utilizado?",
-    "ground_truth": "O modelo é o sentence-transformers/all-MiniLM-L6-v2.",
-    "contexts": ["RAG: embedding_model=sentence-transformers/all-MiniLM-L6-v2."]
-  },
-  {
-    "question": "Como o drift é calculado?",
-    "ground_truth": "O drift é calculado usando Evidently com DataDriftPreset e TargetDriftPreset.",
-    "contexts": ["Drift: Evidently DataDriftPreset e TargetDriftPreset."]
-  },
-  {
-    "question": "Qual o threshold de retreino por drift?",
-    "ground_truth": "O threshold é de 0.2 (20%).",
-    "contexts": ["Monitoring: retrain_threshold=0.2."]
+    "question": "Qual o score de Fidelidade (Faithfulness) do nosso RAG?",
+    "ground_truth": "O nosso pipeline RAG apresenta um score de Fidelidade (Faithfulness) de 0.92, superando nossa meta de 0.80.",
+    "contexts": ["Avaliação RAGAS: Faithfulness=0.92, indicando baixa taxa de alucinação do modelo Qwen."]
   }
 ]

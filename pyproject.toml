@@ -38,9 +38,9 @@ dependencies = [
     "ragas>=0.1.7",
     "datasets>=2.19.0",
     "transformers==4.41.2",         # A versão de compatibilidade perfeita
-    "sentence-transformers==2.7.0", 
+    "sentence-transformers==2.7.0",
     "accelerate>=0.28.0",
-    "pypdf>=4.1.0",                 
+    "pypdf>=4.1.0",
 
     "trulens-eval>=0.26.0",
     "presidio-analyzer>=2.2.35",
@@ -167,10 +167,10 @@ markers = [
 
 [tool.coverage.run]
 omit = [
-    "src/models/baseline.py", 
-    "src/models/train.py", 
-    "src/monitoring/metrics.py", 
-    "src/features/feature_store.py", 
+    "src/models/baseline.py",
+    "src/models/train.py",
+    "src/monitoring/metrics.py",
+    "src/features/feature_store.py",
     "src/agent/rag_pipeline.py",
     "src/serving/app.py",
     "src/features/feature_engineering.py"

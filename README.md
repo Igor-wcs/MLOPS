@@ -28,7 +28,7 @@ Abra o seu terminal (PowerShell no Windows ou Terminal no Mac/Linux).
     .\.venv\Scripts\activate
     # Para Mac/Linux:
     source .venv/bin/activate
-    
+
     pip install -e .
     ```
 

@@ -1,8 +1,8 @@
 # 🚨 Relatório de Red Teaming e Testes Adversariais
 
-**Data:** 30 de Abril de 2026  
-**Alvo:** Agente Financeiro ReAct (Qwen 0.5B)  
-**Status:** ✅ Aprovado com Ressalvas  
+**Data:** 30 de Abril de 2026
+**Alvo:** Agente Financeiro ReAct (Qwen 0.5B)
+**Status:** ✅ Aprovado com Ressalvas
 
 ---
 

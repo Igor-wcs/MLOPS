@@ -14,10 +14,10 @@ x-airflow-common:
     AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-chave_secreta_padrao_datathon}
     PYTHONPATH: /opt/airflow
   volumes:
-    - ./dags:/opt/airflow/dags   
-    - ./src:/opt/airflow/src     
+    - ./dags:/opt/airflow/dags
+    - ./src:/opt/airflow/src
     - ./configs:/opt/airflow/configs
-    - ./mlruns:/opt/airflow/mlruns 
+    - ./mlruns:/opt/airflow/mlruns
     - ./data:/opt/airflow/data
   depends_on:
     postgres:
@@ -83,7 +83,17 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
-  # ... (Prometheus and Grafana remain same)
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   api:
     <<: *airflow-common
