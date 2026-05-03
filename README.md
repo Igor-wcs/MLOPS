@@ -68,6 +68,8 @@ python src/agent/rag_pipeline.py
 Este é o comando que ativa a API para você conversar com o agente.
 
 ```powershell
+docker-compose up --build
+ou
 uvicorn src.serving.app:app --port 8000 --reload
 ```
 > **Dica:** Mantenha esta janela do terminal aberta. Se fechar, o sistema para de responder.
@@ -81,7 +83,7 @@ Com o sistema rodando, você pode acessar todas as ferramentas de governança at
 | Ferramenta | O que faz? | Endereço (URL) |
 | :--- | :--- | :--- |
 | **🤖 Chat da IA** | Interface para testar o Agente (Swagger) | [http://localhost:8000/docs](http://localhost:8000/docs) |
-| **📈 MLflow** | Gestão de Modelos e Experimentos | [http://localhost:5000](http://localhost:5000) |
+| **📈 MLflow** | Gestão de Modelos e Experimentos | [http://127.0.0.1:5000](http://localhost:5000) |
 | **📉 Grafana** | Painéis de monitoramento técnico | [http://localhost:3000](http://localhost:3000) |
 | **⏱️ Airflow** | Agendamento de tarefas e retreino | [http://localhost:8080](http://localhost:8080) |
 | **📡 Prometheus** | Coleta de métricas em tempo real | [http://localhost:9090](http://localhost:9090) |
