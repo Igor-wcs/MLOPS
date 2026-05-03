@@ -85,7 +85,9 @@ def obter_previsao_lstm(ticker: str) -> str:
         # Tentativa de carregar pesos (caso o usuário já tenha rodado o treino)
         model_weights_path = root / "model_weights.pt"
         if model_weights_path.exists():
-            modelo.load_state_dict(torch.load(model_weights_path, map_location="cpu", weights_only=True))
+            modelo.load_state_dict(
+                torch.load(model_weights_path, map_location="cpu", weights_only=True)
+            )
         else:
             logger.warning(
                 f"Pesos do modelo não encontrados em {model_weights_path}. "
