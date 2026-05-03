@@ -58,7 +58,8 @@ WORKDIR /opt/airflow
 COPY --chown=airflow:root pyproject.toml README.md ./
 # Nota: O Airflow aqui instala as dependências extras necessárias para orquestração
 RUN pip install --no-cache-dir . && \
-    pip install --no-cache-dir mlflow dvc[s3] redis yfinance
+    pip install --no-cache-dir mlflow dvc[s3] redis yfinance && \
+    pip install --no-cache-dir "SQLAlchemy<2.0"
 
 # Copia o código e DAGs para o contexto do Airflow
 COPY --chown=airflow:root src/ ./src/
