@@ -2,11 +2,12 @@ import logging
 import os
 import sys
 from datetime import datetime, timedelta
+
 import yaml
-from mlflow.tracking import MlflowClient
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator, ShortCircuitOperator
+from mlflow.tracking import MlflowClient
 
 # Configuração de Logs
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -15,8 +16,6 @@ logger = logging.getLogger(__name__)
 # Adiciona o diretório raiz ao path para que os módulos src sejam encontrados
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import yaml
-from mlflow.tracking import MlflowClient
 
 from src.monitoring.drift import gerar_relatorio_drift
 
