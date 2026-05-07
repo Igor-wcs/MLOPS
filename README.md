@@ -49,12 +49,14 @@ pip install -e .
 O sistema precisa de bancos de dados e painéis que rodam dentro do Docker. Certifique-se de que o **Docker Desktop** esteja aberto.
 
 ```powershell
+docker compose up --build -d
+
 docker-compose up -d
 ```
 *Aguarde alguns minutos até que todos os containers fiquem verdes no Docker Desktop.*
 
 ### 3. Treinar e Preparar a IA
-Agora vamos ensinar o sistema a prever preços e ler os manuais.
+Agora vamos ensinar o sistema a prever preços e ler os manuais. (Importante para a LLM aprender e funcionar)
 
 ```powershell
 # 1. Treinar o modelo de previsão (Petrobras)
@@ -68,8 +70,6 @@ python src/agent/rag_pipeline.py
 Este é o comando que ativa a API para você conversar com o agente.
 
 ```powershell
-docker-compose up --build
-ou
 uvicorn src.serving.app:app --port 8000 --reload
 ```
 > **Dica:** Mantenha esta janela do terminal aberta. Se fechar, o sistema para de responder.

@@ -10,7 +10,10 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
-WORKDIR /app
+# Cria o usuário airflow para paridade com a imagem oficial do Airflow
+RUN useradd -u 50000 -g 0 -m -s /bin/bash airflow
+
+WORKDIR /opt/airflow
 
 # 1. Instala dependências do sistema
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -21,23 +24,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Copia APENAS o requirements para a raiz do container (Otimização de Cache)
-COPY requirements.txt ./
+COPY --chown=airflow:0 requirements.txt ./
 
 # 3. Instala as dependências Python
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
-    python -m spacy download en_core_web_sm
+    python -m spacy download pt_core_news_lg
 
 # 4. Agora copia o restante dos arquivos de configuração e metadados
-COPY pyproject.toml README.md ./
+COPY --chown=airflow:0 pyproject.toml README.md ./
 
 # 5. Copia as pastas de código e recursos
-COPY src/ ./src/
-COPY configs/ ./configs/
-COPY data/ ./data/
+COPY --chown=airflow:0 src/ ./src/
+COPY --chown=airflow:0 configs/ ./configs/
+COPY --chown=airflow:0 data/ ./data/
 
 # --- ESTÁGIO 2: API (Imagem Otimizada para Inferência) ---
 FROM base-image as api
+USER airflow
 EXPOSE 8000
 # Comando de inicialização da API
 CMD ["uvicorn", "src.serving.app:app", "--host", "0.0.0.0", "--port", "8000"]

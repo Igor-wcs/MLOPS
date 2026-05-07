@@ -13,11 +13,13 @@ x-airflow-common:
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-chave_secreta_padrao_datathon}
     PYTHONPATH: /opt/airflow
+    MLFLOW_TRACKING_URI: http://mlflow:5000
   volumes:
     - ./dags:/opt/airflow/dags
     - ./src:/opt/airflow/src
     - ./configs:/opt/airflow/configs
     - ./mlruns:/opt/airflow/mlruns
+    - ./mlruns:/app/mlruns
     - ./data:/opt/airflow/data
   depends_on:
     postgres:
@@ -71,7 +73,7 @@ services:
   mlflow:
     <<: *airflow-common
     command: >
-      bash -c "mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////opt/airflow/mlruns/mlflow.db --default-artifact-root /opt/airflow/mlruns"
+      bash -c "mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////opt/airflow/mlruns/mlflow.db --default-artifact-root /opt/airflow/mlruns --serve-artifacts"
     ports:
       - "5000:5000"
     healthcheck:
@@ -94,12 +96,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
   api:
     <<: *airflow-common
     build:
       context: .
       target: api
+    environment:
+      <<: *airflow-common-env
+      PYTHONPATH: /opt/airflow
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - .:/opt/airflow
     command: uvicorn src.serving.app:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"

@@ -5,19 +5,19 @@ stages:
     deps:
     - path: configs/model_config.yaml
       hash: md5
-      md5: 2a0b6a718cadbbaf743d573a678d8f7b
-      size: 1761
+      md5: 9740fd365d0326b37eb2d1426805a9ef
+      size: 1908
     - path: src/features/feature_engineering.py
       hash: md5
-      md5: 1d4d3601f81a55414ec6dfcd276a9a21
-      size: 3355
+      md5: 52ba94ad4f5c17adfd5c24d15ecceb89
+      size: 3329
     params:
       configs/model_config.yaml:
         data.window_size: 30
     outs:
     - path: data/processed
       hash: md5
-      md5: da7b960ae3afd90cbe8c7da0b58da26f.dir
+      md5: ce8b4061e47be48c01bc050616df960c.dir
       size: 1405725
       nfiles: 3
   train:
@@ -25,17 +25,29 @@ stages:
     deps:
     - path: configs/model_config.yaml
       hash: md5
-      md5: 2a0b6a718cadbbaf743d573a678d8f7b
-      size: 1761
+      md5: 9740fd365d0326b37eb2d1426805a9ef
+      size: 1908
     - path: data/processed
       hash: md5
-      md5: da7b960ae3afd90cbe8c7da0b58da26f.dir
+      md5: ce8b4061e47be48c01bc050616df960c.dir
       size: 1405725
       nfiles: 3
+    - path: src/models/lstm_factory.py
+      hash: md5
+      md5: 346d3e54555c0e16025f337404c4d0c7
+      size: 535
+    - path: src/models/lstm_model.py
+      hash: md5
+      md5: 39ec4695cbb9257a213b8955134ff22e
+      size: 1521
+    - path: src/models/lstm_params.py
+      hash: md5
+      md5: e26f97aae11bcf20234e96205e19b96c
+      size: 555
     - path: src/models/train.py
       hash: md5
-      md5: 8598fdaf972ca40bc9a7e7ab00f39640
-      size: 8689
+      md5: 623217202d62b94d1c8e9869f0d005f3
+      size: 9177
     params:
       configs/model_config.yaml:
         business_metric:
@@ -51,13 +63,17 @@ stages:
           dropout_rate: 0.2
         training:
           learning_rate: 0.001
-          num_epochs: 1
+          num_epochs: 30
           batch_size: 32
           early_stopping_patience: 5
     outs:
+    - path: model_weights.pt
+      hash: md5
+      md5: 446f9f2c83588ef14537293019189ffd
+      size: 811148
     - path: scaler.pkl
       hash: md5
-      md5: 9157e2abb2da3d6faa8aecf80465db74
+      md5: f15571b998a2c48647a2d732453622e7
       size: 909
   evaluate:
     cmd: python -m evaluation.ragas_eval

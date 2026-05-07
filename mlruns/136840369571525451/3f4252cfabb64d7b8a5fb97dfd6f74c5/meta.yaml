@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/igor_/OneDrive/Desktop/Tecnologia%20da%20Informa%C3%A7%C3%A3o%20-%20TI/Projeto%20FIAP/MLOPS/mlruns/136840369571525451/3f4252cfabb64d7b8a5fb97dfd6f74c5/artifacts
+end_time: 1778112212348
+entry_point_name: ''
+experiment_id: '136840369571525451'
+lifecycle_stage: active
+run_id: 3f4252cfabb64d7b8a5fb97dfd6f74c5
+run_name: Monitoring_Drift_Evidently
+run_uuid: 3f4252cfabb64d7b8a5fb97dfd6f74c5
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1778112201536
+status: 3
+tags: []
+user_id: igor_
