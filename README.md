@@ -19,6 +19,13 @@ Para facilitar sua navegação, aqui está o que você encontrará em cada pasta
 
 ---
 
+##   Arquitetura
+
+<img width="2816" height="1536" alt="Gemini_Generated_Image_iw5c2iw5c2iw5c2i" src="https://github.com/user-attachments/assets/1a7ccfd5-2c05-4e25-9c6f-0e6b622f0b19" />
+
+---
+
+
 ## 🛠️ Guia de Instalação Passo a Passo (PowerShell)
 
 Este guia foi feito para que qualquer pessoa consiga rodar o projeto do zero. Siga os comandos na ordem exata.
